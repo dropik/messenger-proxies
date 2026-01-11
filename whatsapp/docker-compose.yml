@@ -1,0 +1,38 @@
+services:
+  whatsapp-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-proxy
+    restart: unless-stopped
+    networks:
+      - proxy_net
+    ports:
+      # TCP ports (HOST:CONTAINER)
+      - "5080:80"         # HTTP -> g.whatsapp.net:80
+      - "5443:443"        # HTTPS/TLS -> g.whatsapp.net:5222
+      - "5587:587"        # Media -> whatsapp.net:443
+      - "7777:7777"       # Media alt -> whatsapp.net:443
+      - "5222:5222"       # XMPP -> g.whatsapp.net:5222
+      - "5880:8080"       # Alternative HTTP
+      - "5843:8443"       # Alternative HTTPS
+      - "8404:8404"       # HAProxy stats
+    healthcheck:
+      test: ["CMD", "haproxy", "-c", "-f", "/etc/haproxy/haproxy.cfg"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  proxy_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+        - subnet: fd00:dead:beef::/48
