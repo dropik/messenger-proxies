@@ -1,0 +1,43 @@
+services:
+  private-dns:
+    build: .
+    container_name: private-dns
+    restart: unless-stopped
+    ports:
+      # DNS (standard)
+      - "53:53/tcp"
+      - "53:53/udp"
+      # DNS-over-TLS (for Private DNS)
+      - "853:853/tcp"
+      - "853:853/udp"
+      # Web UI (HTTP only - port 443 reserved for WhatsApp proxy)
+      - "3000:3000/tcp"
+    volumes:
+      # Config file with secrets
+      - ./config:/config:ro
+      # Persistent data
+      - adguard_conf:/opt/adguardhome/conf
+      - adguard_work:/opt/adguardhome/work
+      - adguard_certs:/opt/adguardhome/certs
+      - acme_data:/root/.acme.sh
+    cap_add:
+      - NET_BIND_SERVICE
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - dns_network
+
+networks:
+  dns_network:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+        - subnet: fd00:dead:beef:21::/64
+
+volumes:
+  adguard_conf:
+  adguard_work:
+  adguard_certs:
+  acme_data:
