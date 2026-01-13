@@ -1,0 +1,35 @@
+services:
+  netdata:
+    image: netdata/netdata:stable
+    container_name: netdata
+    hostname: vps-monitor
+    restart: unless-stopped
+    ports:
+      - "19999:19999"
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      # Host system metrics
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      # Docker container monitoring
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Persistent config and data
+      - netdata-config:/etc/netdata
+      - netdata-lib:/var/lib/netdata
+      - netdata-cache:/var/cache/netdata
+    environment:
+      - NETDATA_CLAIM_TOKEN=  # Optional: for Netdata Cloud
+      - NETDATA_CLAIM_URL=https://app.netdata.cloud
+      - DOCKER_HOST=/var/run/docker.sock
+
+volumes:
+  netdata-config:
+  netdata-lib:
+  netdata-cache:
