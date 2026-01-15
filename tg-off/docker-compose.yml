@@ -1,0 +1,31 @@
+services:
+  mtproxy:
+    build: .
+    container_name: telegram-mtproxy
+    restart: unless-stopped
+    ports:
+      - "443:443"
+      - "8888:8888"  # Stats
+    volumes:
+      - mtproxy_data:/data
+    environment:
+      # Port inside container (mapped from host)
+      - PORT=443
+      # Optional: Your server's external IP (auto-detected if not set)
+      # - EXTERNAL_IP=your.server.ip
+      # Optional: Fake TLS domain for better obfuscation
+      # Makes traffic look like HTTPS to this domain
+      - FAKE_TLS_DOMAIN=rkn.gov.ru
+    networks:
+      - mtproxy_net
+
+networks:
+  mtproxy_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+        - subnet: fd00:dead:beef:29::/64
+
+volumes:
+  mtproxy_data:
