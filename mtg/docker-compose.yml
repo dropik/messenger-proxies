@@ -1,0 +1,20 @@
+services:
+  mtproxy:
+    image: nineseconds/mtg:2
+    container_name: telegram-mtproxy
+    restart: unless-stopped
+    networks:
+      - tg_proxy_net
+    ports:
+      - "443:443"
+    volumes:
+      - ./config.toml:/config.toml:ro
+    command: run /config.toml
+
+networks:
+  tg_proxy_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+        - subnet: fd00:dead:beef:29::/64
