@@ -1,0 +1,19 @@
+services:
+  mtproxy:
+    image: alexbers/mtprotoproxy
+    container_name: telegram-mtproxy
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./config.py:/home/tgproxy/config.py:ro
+    networks:
+      - mtproxy_net
+
+networks:
+  mtproxy_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
+        - subnet: fd00:dead:beef:29::/64

@@ -1,0 +1,25 @@
+PORT = 443
+
+# Secret (32 hex chars) - generate with: openssl rand -hex 16
+# name -> secret
+USERS = {
+    "tg": "00000000000000000000000000000000",
+}
+
+# Protocol modes
+MODES = {
+    # Classic mode - easy to detect, disabled
+    "classic": False,
+    # DD mode - obfuscated, harder to detect
+    "secure": False,
+    # TLS mode - fake TLS, hardest to detect (recommended)
+    "tls": True
+}
+
+# Domain for fake TLS mode
+# Bad/invalid clients are proxied to this domain
+# Use a real existing domain
+TLS_DOMAIN = "www.google.com"
+
+# Optional: Ad tag from @MTProxybot for sponsored channels
+# AD_TAG = "your_ad_tag_here"
