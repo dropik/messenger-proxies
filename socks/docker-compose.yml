@@ -1,0 +1,21 @@
+services:
+  socks-proxy:
+    build:
+      context: .
+      args:
+        - SOCKS_USER=telegram
+        - SOCKS_PASS=changeme123
+    container_name: telegram-socks
+    restart: unless-stopped
+    ports:
+      - "1080:1080"
+    networks:
+      - socks_net
+
+networks:
+  socks_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+        - subnet: fd00:dead:beef:30::/64
