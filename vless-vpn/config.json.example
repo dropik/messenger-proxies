@@ -27,9 +27,9 @@
           "privateKey": "PrivateKeyHere",
           "minClientVer": "",
           "maxClientVer": "",
-          "maxTimeDiff": 0,
+          "maxTimeDiff": 60000,
           "shortIds": [
-            ""
+            "ShortIdHere"
           ]
         }
       }
@@ -37,7 +37,13 @@
   ],
   "outbounds": [
     {
+      "tag": "freedom",
       "protocol": "freedom",
+      "settings": {}
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole",
       "settings": {}
     }
   ],
