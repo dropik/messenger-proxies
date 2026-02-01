@@ -1,0 +1,22 @@
+services:
+  vless-vpn:
+    image: teddysun/xray
+    container_name: vless-vpn
+    restart: unless-stopped
+    ports:
+      - "443:443/tcp"
+      - "443:443/udp"
+    volumes:
+      - ./config.json:/etc/xray/config.json:ro
+    networks:
+      - vless_net
+    environment:
+      - TZ=UTC
+
+networks:
+  vless_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
+        - subnet: fd00:dead:beef:31::/64
