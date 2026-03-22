@@ -1,3 +1,4 @@
 config.json
+nginx.conf
 certs/
 html/

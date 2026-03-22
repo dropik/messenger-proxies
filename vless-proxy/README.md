@@ -31,17 +31,22 @@ Edit `config.json` and replace:
 - `VPN_SHORT_ID` — Short ID from the upstream server config
 - `/your-secret-path` — Choose a non-obvious path (e.g. `/api/v2/updates`)
 
-**3. Update `nginx.conf`:**
+**3. Create `nginx.conf`:**
+```bash
+cp nginx.conf.example nginx.conf
+```
+
+**4. Update `nginx.conf`:**
 
 Replace:
 - `YOUR_DOMAIN` — your actual domain name (two occurrences)
 - `/your-secret-path` — must match the path in `config.json`
 
-**4. Place your static site under `html/`:**
+**5. Place your static site under `html/`:**
 
 Put any static website files under the `html/` directory. Nginx will serve them for all requests that don't match the VLESS path. At minimum, provide an `index.html`.
 
-**5. Start:**
+**6. Start:**
 ```bash
 docker compose up -d
 docker compose logs -f
