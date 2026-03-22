@@ -1,0 +1,35 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: vless-proxy-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+      - ./html:/usr/share/nginx/html:ro
+    networks:
+      - vless_proxy_net
+    depends_on:
+      - xray-proxy
+
+  xray-proxy:
+    image: teddysun/xray
+    container_name: vless-proxy-xray
+    restart: unless-stopped
+    volumes:
+      - ./config.json:/etc/xray/config.json:ro
+    networks:
+      - vless_proxy_net
+    environment:
+      - TZ=UTC
+
+networks:
+  vless_proxy_net:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.32.0.0/16
+        - subnet: fd00:dead:beef:32::/64

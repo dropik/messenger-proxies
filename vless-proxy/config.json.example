@@ -1,0 +1,73 @@
+{
+  "inbounds": [
+    {
+      "port": 2443,
+      "listen": "0.0.0.0",
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "CLIENT_UUID",
+            "flow": ""
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "none",
+        "xhttpSettings": {
+          "path": "/your-secret-path",
+          "host": "YOUR_DOMAIN"
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "vless-vpn",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "VPN_SERVER_IP",
+            "port": 443,
+            "users": [
+              {
+                "id": "VPN_UUID",
+                "flow": "xtls-rprx-vision",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "fingerprint": "chrome",
+          "serverName": "www.google.com",
+          "publicKey": "VPN_REALITY_PUBLIC_KEY",
+          "shortId": "VPN_SHORT_ID",
+          "spiderX": "/"
+        }
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole",
+      "settings": {}
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "outboundTag": "vless-vpn",
+        "network": "tcp,udp"
+      }
+    ]
+  }
+}
