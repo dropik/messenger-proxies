@@ -14,9 +14,13 @@ Client (VLESS+TLS+xhttp) → Nginx (443) → Xray → Upstream VLESS server
 **1. Place your TLS certificate:**
 ```bash
 mkdir certs
-cp /path/to/your/cert.pem certs/cert.pem
-cp /path/to/your/key.pem  certs/key.pem
+cp /path/to/your/fullchain.pem certs/cert.pem   # must be full chain, not just the leaf cert
+cp /path/to/your/key.pem       certs/key.pem
 ```
+
+> **Important:** `cert.pem` must contain the full certificate chain (leaf + intermediates).
+> For Let's Encrypt use `fullchain.pem`, not `cert.pem`.
+> A leaf-only certificate will cause silent TLS failures in Xray clients with no log output.
 
 **2. Create Xray config:**
 ```bash

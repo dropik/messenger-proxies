@@ -14,11 +14,12 @@
         "decryption": "none"
       },
       "streamSettings": {
-        "network": "ws",
+        "network": "xhttp",
         "security": "none",
-        "wsSettings": {
+        "xhttpSettings": {
           "path": "/your-secret-path",
-          "host": "YOUR_DOMAIN"
+          "host": "YOUR_DOMAIN",
+          "mode": "auto"
         }
       }
     }
