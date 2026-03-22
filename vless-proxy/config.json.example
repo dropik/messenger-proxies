@@ -57,17 +57,39 @@
       }
     },
     {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {}
+    },
+    {
       "tag": "block",
       "protocol": "blackhole",
       "settings": {}
     }
   ],
   "routing": {
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
       {
         "type": "field",
-        "outboundTag": "vless-vpn",
-        "network": "tcp,udp"
+        "domain": [
+          "geosite:youtube",
+          "geosite:telegram",
+          "geosite:whatsapp"
+        ],
+        "outboundTag": "vless-vpn"
+      },
+      {
+        "type": "field",
+        "ip": [
+          "geoip:telegram"
+        ],
+        "outboundTag": "vless-vpn"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "outboundTag": "direct"
       }
     ]
   }
