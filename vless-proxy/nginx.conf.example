@@ -9,15 +9,19 @@ http {
     sendfile on;
     keepalive_timeout 65;
 
+    error_log /dev/stderr warn;
+
     # Redirect HTTP → HTTPS
     server {
         listen 80;
+        listen [::]:80;
         server_name YOUR_DOMAIN;
         return 301 https://$host$request_uri;
     }
 
     server {
         listen 443 ssl;
+        listen [::]:443 ssl;
         server_name YOUR_DOMAIN;
 
         ssl_certificate     /etc/nginx/certs/cert.pem;
