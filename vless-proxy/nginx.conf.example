@@ -41,6 +41,18 @@ http {
             proxy_send_timeout 86400s;
         }
 
+        # Fake auth API — login always returns 401
+        location = /api/auth/login {
+            add_header Content-Type application/json;
+            return 401 '{"error":"invalid_credentials","message":"Неверный email или пароль"}';
+        }
+
+        # Fake auth API — register returns 503
+        location = /api/auth/register {
+            add_header Content-Type application/json;
+            return 503 '{"error":"service_unavailable","message":"Сервис временно недоступен. Попробуйте позже."}';
+        }
+
         # Everything else — serve the website
         location / {
             root /usr/share/nginx/html;
