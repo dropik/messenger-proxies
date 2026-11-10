@@ -1,0 +1,27 @@
+services:
+  vless-relay:
+    image: teddysun/xray
+    container_name: vless-relay
+    restart: unless-stopped
+    ports:
+      - "443:443/tcp"
+    volumes:
+      - ./config.json:/etc/xray/config.json:ro
+    extra_hosts:
+      # Pin the CDN hostname so the relay never looks it up over plain DNS.
+      - "${CDN_HOSTNAME}:${CDN_IP_1}"
+      - "${CDN_HOSTNAME}:${CDN_IP_2}"
+    environment:
+      - TZ=UTC
+    depends_on:
+      - decoy
+
+  # Local REALITY "dest". REALITY contacts dest on every connection, so a real
+  # third-party site would eventually block the relay's IP.
+  decoy:
+    image: nginx:alpine
+    container_name: vless-decoy
+    restart: unless-stopped
+    volumes:
+      - ./decoy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./decoy:/etc/nginx/decoy:ro

@@ -1,0 +1,92 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "vless-in",
+      "port": 443,
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          { "id": "FORWARD_UUID", "email": "forward@relay", "flow": "" },
+          { "id": "DIRECT_UUID", "email": "direct@relay", "flow": "" }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "reality",
+        "xhttpSettings": {
+          "path": "/CLIENT_XHTTP_PATH",
+          "host": "WHITELISTED_SNI",
+          "mode": "auto"
+        },
+        "realitySettings": {
+          "show": false,
+          "dest": "decoy:8443",
+          "xver": 0,
+          "serverNames": ["WHITELISTED_SNI"],
+          "privateKey": "REALITY_PRIVATE_KEY",
+          "minClientVer": "",
+          "maxClientVer": "",
+          "maxTimeDiff": 60000,
+          "shortIds": ["SHORT_ID"]
+        }
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {
+        "domainStrategy": "UseIPv4"
+      }
+    },
+    {
+      "tag": "exit-cdn",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CDN_HOSTNAME",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CDN_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["h2"]
+        },
+        "xhttpSettings": {
+          "path": "/XHTTP_PATH",
+          "mode": "auto"
+        }
+      }
+    },
+    {
+      "tag": "block",
+      "protocol": "blackhole"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "user": ["direct@relay"],
+        "outboundTag": "direct"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "outboundTag": "exit-cdn"
+      }
+    ]
+  }
+}

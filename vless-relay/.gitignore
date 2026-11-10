@@ -1,0 +1,4 @@
+config.json
+.env
+decoy/*.pem
+*.bak-*
