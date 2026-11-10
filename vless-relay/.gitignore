@@ -1,4 +1,6 @@
 config.json
 .env
 decoy/*.pem
+subscription/subs.json
+subscription/worker.js
 *.bak-*
