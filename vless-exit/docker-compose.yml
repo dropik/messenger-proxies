@@ -1,0 +1,13 @@
+services:
+  vless-exit:
+    image: teddysun/xray
+    container_name: vless-exit
+    restart: unless-stopped
+    ports:
+      # Reached only through the CDN; firewall/ restricts it to CDN ranges.
+      - "8443:8443/tcp"
+    volumes:
+      - ./config.json:/etc/xray/config.json:ro
+      - ./certs:/etc/xray/certs:ro
+    environment:
+      - TZ=UTC

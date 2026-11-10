@@ -1,0 +1,13 @@
+[Unit]
+Description=Restrict the Docker-published exit port to CDN ranges
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+Environment=PORT=8443
+ExecStart=/usr/local/sbin/cdn-only-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
