@@ -25,6 +25,9 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
   authentication. Users are told apart with `email` and `"user"` routing rules.
 - **`direct` is the first outbound**, so anything no rule matches never falls through
   to an exit that might be down.
+- **`exit-cdn` uses xhttp `stream-up`**: uploads go as one long HTTP/2 stream instead
+  of many small requests (about 6x faster uploads, far fewer CDN requests). It needs
+  gRPC enabled at the CDN (Cloudflare: Network → gRPC); without it, use `packet-up`.
 - **The CDN hostname is pinned** to the zone's IPs (`.env`), so the relay never sends
   a plain-text DNS query for it.
 

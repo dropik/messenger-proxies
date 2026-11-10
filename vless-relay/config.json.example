@@ -68,7 +68,7 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
-          "mode": "auto"
+          "mode": "stream-up"
         }
       }
     },
