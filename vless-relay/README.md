@@ -59,6 +59,23 @@ vless://USER_UUID@RELAY_IP:443?encryption=none&security=reality&sni=WHITELISTED_
 
 Get the public key from the private one with `xray x25519 -i REALITY_PRIVATE_KEY`.
 
+## Subscriptions
+
+One subscription URL per user group, served by a free Cloudflare Worker on
+`*.workers.dev`, so it survives the relay going down and never reveals the exit's
+domain. When the relay changes (new IP, SNI or key), regenerate and redeploy: apps
+pick it up on their next refresh, with no new links to hand out.
+
+```bash
+python3 subscription/gen_worker.py --address RELAY_IP   # first run: creates tokens in subs.json
+python3 subscription/gen_worker.py                      # after config changes: same tokens
+```
+
+Paste `subscription/worker.js` into the Worker editor (Workers & Pages → your Worker →
+Edit code) and deploy. URLs are `https://WORKER.workers.dev/TOKEN`; any other path is
+a 404. In client apps, turn on **update via proxy** where available, so refreshes go
+through the VPN and the subscription host is never contacted directly from Russia.
+
 ## Checks
 
 ```bash
