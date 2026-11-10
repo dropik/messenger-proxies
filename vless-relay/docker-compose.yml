@@ -1,6 +1,6 @@
 services:
   vless-relay:
-    image: teddysun/xray
+    image: teddysun/xray:26.10.31   # pinned: upgrade relay and exit together
     container_name: vless-relay
     restart: unless-stopped
     ports:
