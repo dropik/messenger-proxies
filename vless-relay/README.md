@@ -28,6 +28,9 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
 - **`exit-cdn` uses xhttp `stream-up`**: uploads go as one long HTTP/2 stream instead
   of many small requests (about 6x faster uploads, far fewer CDN requests). It needs
   gRPC enabled at the CDN (Cloudflare: Network → gRPC); without it, use `packet-up`.
+- **No access log.** Xray's access log would record every user's home IP next to the
+  sites they visit, on a server under Russian jurisdiction. `"access": "none"` keeps
+  only warnings and errors; turn it on briefly when debugging (see Checks).
 - **The CDN hostname is pinned** to the zone's IPs (`.env`), so the relay never sends
   a plain-text DNS query for it.
 
@@ -60,7 +63,12 @@ Get the public key from the private one with `xray x25519 -i REALITY_PRIVATE_KEY
 
 ```bash
 docker run --rm -v $PWD/config.json:/c.json:ro teddysun/xray xray run -test -c /c.json
-docker logs --since 10m vless-relay | grep accepted     # shows user and chosen outbound
+docker logs --since 10m vless-relay                     # warnings and errors only
 ```
+
+To see which user and outbound each connection takes while debugging, remove
+`"access": "none"` from `log`, run `docker compose up -d --force-recreate`, check
+`docker logs vless-relay | grep accepted`, then put it back and recreate again (that
+also drops the logged lines).
 
 If the CDN's IPs for the zone ever change, update `.env` and run `docker compose up -d`.
