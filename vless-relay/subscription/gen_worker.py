@@ -60,7 +60,8 @@ def main():
         if not args.address:
             sys.exit("first run: pass --address RELAY_IP")
         subs = {"address": args.address, "update_hours": 12, "groups": {
-            email: {"title": "Relay", "token": secrets.token_urlsafe(24)} for email in clients}}
+            email: {"title": "Relay " + email.split("@")[0], "token": secrets.token_urlsafe(24)}
+            for email in clients}}
     if args.address:
         subs["address"] = args.address
 
