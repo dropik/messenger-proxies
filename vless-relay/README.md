@@ -66,14 +66,24 @@ One subscription URL per user group, served by a free Cloudflare Worker on
 domain. When the relay changes (new IP, SNI or key), regenerate and redeploy: apps
 pick it up on their next refresh, with no new links to hand out.
 
+First time, on the relay (creates the tokens), then add `"worker_name"` and
+`"worker_host"` (e.g. `name.subdomain.workers.dev`) to `subscription/subs.json`:
+
 ```bash
-python3 subscription/gen_worker.py --address RELAY_IP   # first run: creates tokens in subs.json
-python3 subscription/gen_worker.py                      # after config changes: same tokens
+python3 subscription/gen_worker.py --address RELAY_IP
 ```
 
-Paste `subscription/worker.js` into the Worker editor (Workers & Pages → your Worker →
-Edit code) and deploy. URLs are `https://WORKER.workers.dev/TOKEN`; any other path is
-a 404. In client apps, turn on **update via proxy** where available, so refreshes go
+After any relay config change, deploy from **your own machine** (Node.js, plus
+`npx wrangler login` once). It regenerates on the relay over ssh, deploys with
+wrangler, deletes the local copy and checks both URLs:
+
+```bash
+python vless-relay/subscription/deploy.py root@RELAY_IP
+```
+
+The Cloudflare login never touches the relay: whoever controls the relay must not be
+able to rewrite the Worker and hand users a config of their own. URLs are
+`https://WORKER_HOST/TOKEN`; any other path is a 404. In client apps, turn on **update via proxy** where available, so refreshes go
 through the VPN and the subscription host is never contacted directly from Russia.
 
 ## Checks
