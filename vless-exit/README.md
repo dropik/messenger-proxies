@@ -59,6 +59,11 @@ Cloudflare's ranges change rarely, but re-fetch them if Cloudflare announces new
 
 ## Notes
 
+- Xray resolves destinations itself over DNS-over-HTTPS (`dns` block), not through
+  Docker's embedded DNS. Through Docker, lookups inherit the host's resolvers (often
+  including unreachable IPv6 ones) and parallel UDP queries get dropped by conntrack:
+  in practice about 2,000 failed lookups a day, each a failed first attempt for the user.
+
 - The relay pins `CDN_HOSTNAME` to the zone's Cloudflare IPs (see its `.env`), so it
   never resolves the name over plain DNS. Cloudflare routes by SNI, so the zone's
   assigned IPs keep working even if Cloudflare rotates them later.
