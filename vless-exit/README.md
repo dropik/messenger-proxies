@@ -57,6 +57,38 @@ From any non-CDN host, `https://EXIT_IP:8443/` must now time out, while
 CloudFront), append its origin-facing ranges to the same file and restart the unit.
 Cloudflare's ranges change rarely, but re-fetch them if Cloudflare announces new ones.
 
+## 4. Second CDN: origin certificate (for CloudFront)
+
+CloudFront needs the origin to be a **hostname** with a **publicly trusted**
+certificate (it does not trust the Cloudflare Origin CA). Use a free dynDNS name
+(for example DuckDNS) pointing at the exit, so the exit's IP is never tied to your
+Cloudflare domain. Xray serves both certificates on `8443` and picks one by SNI.
+
+```bash
+mkdir -p acme && chmod 700 acme
+cp acme/acme.env.example acme/acme.env            # set ACME_DOMAIN to the dynDNS name
+read -rsp "DuckDNS token: " T && printf 'DuckDNS_Token=%s\n' "$T" > acme/duckdns.env \
+  && chmod 600 acme/duckdns.env && unset T
+sh acme/renew.sh                                   # issues via DNS-01, installs certs/origin-*.pem
+```
+
+Add the second certificate to the `cdn-in` inbound's `tlsSettings.certificates`:
+
+```json
+{ "certificateFile": "/etc/xray/certs/origin-fullchain.pem", "keyFile": "/etc/xray/certs/origin-key.pem" }
+```
+
+Daily renewal (restarts Xray only when the certificate actually changed):
+
+```bash
+sudo install -m 644 acme/acme-renew.service acme/acme-renew.timer /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now acme-renew.timer
+```
+
+The DuckDNS token can edit every name in that DuckDNS account, so keep the account for
+this only. It lives on the exit, which is fine: whoever controls the exit already
+controls the traffic.
+
 ## Notes
 
 - Xray resolves destinations itself over DNS-over-HTTPS (`dns` block), not through

@@ -1,0 +1,10 @@
+[Unit]
+Description=Renew the exit's origin certificate (Let's Encrypt, DNS-01)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust User and the path to your checkout.
+User=debian
+ExecStart=/bin/sh /home/debian/messenger-proxies/vless-exit/acme/renew.sh
