@@ -5,7 +5,7 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
-Environment=PORT=8443
+Environment="PORTS=8443 8444"
 ExecStart=/usr/local/sbin/cdn-only-firewall
 RemainAfterExit=yes
 

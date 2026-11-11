@@ -31,6 +31,14 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
 - **No access log.** Xray's access log would record every user's home IP next to the
   sites they visit, on a server under Russian jurisdiction. `"access": "none"` keeps
   only warnings and errors; turn it on briefly when debugging (see Checks).
+- **Second CDN as automatic fallback.** `burstObservatory` checks both exits every
+  minute; the `exit` balancer uses `exit-cdn` (Cloudflare, xhttp) while it is healthy
+  and falls back to `exit-cloudfront` (CloudFront, WebSocket) only when it is not.
+  CloudFront cannot carry xhttp (it buffers streaming responses), hence WebSocket. From
+  Russia, uploads to CloudFront are throttled and page loads often stall (in testing,
+  10 of 32 fast vs 32 of 32 over Cloudflare), so it is an emergency path only. With a
+  single CDN, drop `exit-cloudfront`, the observatory and the balancer, and route to
+  `exit-cdn` directly.
 - **The CDN hostname is pinned** to the zone's IPs (`.env`), so the relay never sends
   a plain-text DNS query for it.
 

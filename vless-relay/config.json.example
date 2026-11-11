@@ -74,11 +74,54 @@
       }
     },
     {
+      "tag": "exit-cloudfront",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CLOUDFRONT_HOSTNAME",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CLOUDFRONT_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["http/1.1"]
+        },
+        "wsSettings": {
+          "path": "/WS_PATH",
+          "host": "CLOUDFRONT_HOSTNAME"
+        }
+      }
+    },
+    {
       "tag": "block",
       "protocol": "blackhole"
     }
   ],
+  "burstObservatory": {
+    "subjectSelector": ["exit-"],
+    "pingConfig": {
+      "destination": "https://www.gstatic.com/generate_204",
+      "interval": "1m",
+      "sampling": 3,
+      "timeout": "10s"
+    }
+  },
   "routing": {
+    "balancers": [
+      {
+        "tag": "exit",
+        "selector": ["exit-cdn"],
+        "fallbackTag": "exit-cloudfront",
+        "strategy": { "type": "leastPing" }
+      }
+    ],
     "rules": [
       {
         "type": "field",
@@ -88,7 +131,7 @@
       {
         "type": "field",
         "network": "tcp,udp",
-        "outboundTag": "exit-cdn"
+        "balancerTag": "exit"
       }
     ]
   }
