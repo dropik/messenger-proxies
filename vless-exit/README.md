@@ -96,6 +96,43 @@ The DuckDNS token can edit every name in that DuckDNS account, so keep the accou
 this only. It lives on the exit, which is fine: whoever controls the exit already
 controls the traffic.
 
+## 5. Second CDN: CloudFront over WebSocket
+
+CloudFront withholds and buffers streaming responses, so xhttp stalls through it (all
+modes, gRPC on or off). WebSocket passes through cleanly, so the CloudFront path uses
+its own inbound on port `8444` (published in `docker-compose.yml`, covered by the
+firewall via `PORTS="8443 8444"`):
+
+```json
+{
+  "tag": "cdn-ws", "port": 8444, "protocol": "vless",
+  "settings": { "clients": [{ "id": "RELAY_UUID", "email": "relay@cdn" }], "decryption": "none" },
+  "streamSettings": {
+    "network": "ws", "security": "tls",
+    "tlsSettings": { "minVersion": "1.3", "alpn": ["http/1.1"],
+      "certificates": [{ "certificateFile": "/etc/xray/certs/origin-fullchain.pem",
+                         "keyFile": "/etc/xray/certs/origin-key.pem" }] },
+    "wsSettings": { "path": "/WS_PATH" }
+  }
+}
+```
+
+CloudFront distribution:
+
+| Setting | Value |
+|---|---|
+| Origin domain | the dynDNS name (`ACME_DOMAIN`), HTTPS only, port **8444** |
+| Origin response / keep-alive timeout | 60 s |
+| Viewer protocol | HTTPS only; HTTP/2 and HTTP/3 on |
+| Allowed methods | all |
+| Cache policy | CachingDisabled |
+| Origin request policy | **AllViewerExceptHostHeader** (forwarding Host breaks origin TLS: 502) |
+| Compression, WAF, logging | off |
+
+From Russia, uploads to CloudFront are throttled (about 0.1–0.25 MB/s, while the same
+path from outside Russia does 15 MB/s), so treat it as an emergency fallback; the relay
+only switches to it when the Cloudflare path fails its health check.
+
 ## Notes
 
 - Xray resolves destinations itself over DNS-over-HTTPS (`dns` block), not through

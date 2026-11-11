@@ -5,7 +5,8 @@ services:
     restart: unless-stopped
     ports:
       # Reached only through the CDN; firewall/ restricts it to CDN ranges.
-      - "8443:8443/tcp"
+      - "8443:8443/tcp"   # Cloudflare (xhttp)
+      - "8444:8444/tcp"   # CloudFront (WebSocket); drop if you only use one CDN
     volumes:
       - ./config.json:/etc/xray/config.json:ro
       - ./certs:/etc/xray/certs:ro
