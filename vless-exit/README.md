@@ -53,9 +53,16 @@ sudo systemctl daemon-reload && sudo systemctl enable --now cdn-only-firewall
 ```
 
 From any non-CDN host, `https://EXIT_IP:8443/` must now time out, while
-`https://CDN_HOSTNAME/` still reaches Xray (404). For a second CDN (for example
-CloudFront), append its origin-facing ranges to the same file and restart the unit.
-Cloudflare's ranges change rarely, but re-fetch them if Cloudflare announces new ones.
+`https://CDN_HOSTNAME/` still reaches Xray (404).
+
+With a second CDN, let `update-ranges.sh` build the list from both sources (Cloudflare's
+published list and AWS's `CLOUDFRONT_ORIGIN_FACING` ranges) and reapply the firewall.
+It refuses to replace the file if either download comes back empty. Re-run it when
+either CDN announces new ranges:
+
+```bash
+sudo sh firewall/update-ranges.sh
+```
 
 ## 4. Second CDN: origin certificate (for CloudFront)
 
