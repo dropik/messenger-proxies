@@ -3,7 +3,9 @@
 #
 # Docker-published ports bypass ufw/INPUT rules, so the filter lives in the
 # DOCKER-USER chain (FORWARD path) and matches the original destination port.
-# Idempotent: safe to re-run after changing the ranges file or the port list.
+# Only NEW connections are checked: with a few hundred CDN ranges, matching every
+# packet of a busy stream would cost real CPU; established ones are then accepted
+# by Docker's own conntrack rules. Idempotent: safe to re-run.
 set -e
 
 PORTS="${PORTS:-${PORT:-8443}}"
@@ -16,12 +18,13 @@ iptables -N DOCKER-USER 2>/dev/null || true
 for PORT in $PORTS; do
   CHAIN="CDN-ONLY-$PORT"
   iptables -N "$CHAIN" 2>/dev/null || iptables -F "$CHAIN"
-  while read -r net; do
-    case "$net" in ''|\#*) continue ;; esac
+  grep -vE '^(#|$)' "$RANGES" | sort -u | while read -r net; do
     iptables -A "$CHAIN" -s "$net" -j RETURN
-  done < "$RANGES"
+  done
   iptables -A "$CHAIN" -j DROP
-  iptables -C DOCKER-USER -i "$IF" -p tcp -m conntrack --ctorigdstport "$PORT" -j "$CHAIN" 2>/dev/null \
-    || iptables -I DOCKER-USER 1 -i "$IF" -p tcp -m conntrack --ctorigdstport "$PORT" -j "$CHAIN"
-  echo "port $PORT on $IF limited to $(grep -cvE '^(#|$)' "$RANGES") ranges"
+  # remove the older per-packet hook if present
+  iptables -D DOCKER-USER -i "$IF" -p tcp -m conntrack --ctorigdstport "$PORT" -j "$CHAIN" 2>/dev/null || true
+  iptables -C DOCKER-USER -i "$IF" -p tcp -m conntrack --ctstate NEW --ctorigdstport "$PORT" -j "$CHAIN" 2>/dev/null \
+    || iptables -I DOCKER-USER 1 -i "$IF" -p tcp -m conntrack --ctstate NEW --ctorigdstport "$PORT" -j "$CHAIN"
+  echo "port $PORT on $IF: new connections limited to $(grep -vE '^(#|$)' "$RANGES" | sort -u | wc -l) ranges"
 done

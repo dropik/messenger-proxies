@@ -34,6 +34,11 @@
           "maxTimeDiff": 60000,
           "shortIds": ["SHORT_ID"]
         }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
       }
     }
   ],
@@ -74,12 +79,12 @@
       }
     },
     {
-      "tag": "exit-cloudfront",
+      "tag": "exit-gcore",
       "protocol": "vless",
       "settings": {
         "vnext": [
           {
-            "address": "CLOUDFRONT_HOSTNAME",
+            "address": "GCORE_HOSTNAME",
             "port": 443,
             "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
           }
@@ -89,13 +94,103 @@
         "network": "ws",
         "security": "tls",
         "tlsSettings": {
-          "serverName": "CLOUDFRONT_HOSTNAME",
+          "serverName": "GCORE_HOSTNAME",
           "fingerprint": "chrome",
           "alpn": ["http/1.1"]
         },
         "wsSettings": {
           "path": "/WS_PATH",
-          "host": "CLOUDFRONT_HOSTNAME"
+          "host": "GCORE_HOSTNAME"
+        }
+      }
+    },
+    {
+      "tag": "yt-cf-1",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CDN_HOSTNAME",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CDN_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["h2"]
+        },
+        "xhttpSettings": {
+          "path": "/XHTTP_PATH",
+          "mode": "stream-up"
+        }
+      }
+    },
+    {
+      "tag": "yt-cf-2",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CDN_HOSTNAME",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CDN_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["h2"]
+        },
+        "xhttpSettings": {
+          "path": "/XHTTP_PATH",
+          "mode": "stream-up"
+        }
+      }
+    },
+    {
+      "tag": "yt-split-1",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CDN_HOSTNAME",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CDN_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["h2"]
+        },
+        "xhttpSettings": {
+          "path": "/XHTTP_PATH",
+          "mode": "stream-up",
+          "downloadSettings": {
+            "address": "CLOUDFRONT_HOSTNAME",
+            "port": 443,
+            "network": "xhttp",
+            "security": "tls",
+            "tlsSettings": {
+              "serverName": "CLOUDFRONT_HOSTNAME",
+              "fingerprint": "chrome",
+              "alpn": ["h2"]
+            },
+            "xhttpSettings": { "path": "/XHTTP_PATH" }
+          }
         }
       }
     },
@@ -105,7 +200,7 @@
     }
   ],
   "burstObservatory": {
-    "subjectSelector": ["exit-"],
+    "subjectSelector": ["exit-", "yt-"],
     "pingConfig": {
       "destination": "https://www.gstatic.com/generate_204",
       "interval": "1m",
@@ -116,10 +211,16 @@
   "routing": {
     "balancers": [
       {
-        "tag": "exit",
+        "tag": "youtube",
+        "selector": ["yt-"],
+        "fallbackTag": "exit-gcore",
+        "strategy": { "type": "roundRobin" }
+      },
+      {
+        "tag": "rest",
         "selector": ["exit-cdn"],
-        "fallbackTag": "exit-cloudfront",
-        "strategy": { "type": "leastPing" }
+        "fallbackTag": "exit-gcore",
+        "strategy": { "type": "roundRobin" }
       }
     ],
     "rules": [
@@ -130,8 +231,13 @@
       },
       {
         "type": "field",
+        "domain": ["geosite:youtube"],
+        "balancerTag": "youtube"
+      },
+      {
+        "type": "field",
         "network": "tcp,udp",
-        "balancerTag": "exit"
+        "balancerTag": "rest"
       }
     ]
   }

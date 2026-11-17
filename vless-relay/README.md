@@ -31,14 +31,32 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
 - **No access log.** Xray's access log would record every user's home IP next to the
   sites they visit, on a server under Russian jurisdiction. `"access": "none"` keeps
   only warnings and errors; turn it on briefly when debugging (see Checks).
-- **Second CDN as automatic fallback.** `burstObservatory` checks both exits every
-  minute; the `exit` balancer uses `exit-cdn` (Cloudflare, xhttp) while it is healthy
-  and falls back to `exit-cloudfront` (CloudFront, WebSocket) only when it is not.
-  CloudFront cannot carry xhttp (it buffers streaming responses), hence WebSocket. From
-  Russia, uploads to CloudFront are throttled and page loads often stall (in testing,
-  10 of 32 fast vs 32 of 32 over Cloudflare), so it is an emergency path only. With a
-  single CDN, drop `exit-cloudfront`, the observatory and the balancer, and route to
-  `exit-cdn` directly.
+- **From this datacenter, uploads to every foreign CDN except Cloudflare are throttled**
+  (~0.2 MB/s to CloudFront and Gcore; downloads from them run at full speed). So
+  Cloudflare carries all uploads, and other CDNs only ever carry download data.
+- **Split connections (`yt-split-*`)** use xhttp's `downloadSettings`: the upload half
+  goes via Cloudflare, the download half of the same session via CloudFront (both reach
+  the exit's xhttp inbound, which joins them). Tested: 21 MB/s down, 15 MB/s up, 32/32
+  fast page loads. This does **not** work through Gcore, which buffers xhttp download
+  streams (stalls after ~300 KB).
+- **Routing:**
+  - YouTube (sniffed by domain, `geosite:youtube`) round-robins over the `yt-*`
+    outbounds. The live relay uses 7 pure-Cloudflare clones and 3 split ones (~70/30);
+    clone more or fewer to change the ratio (Xray balancers have no weights). This moves
+    about 30% of YouTube's bytes onto CloudFront.
+  - Everything else: Cloudflare (`exit-cdn`).
+  - Fallback for both: `exit-gcore` (Gcore, WebSocket on the exit's `8444`). Page loads
+    work, uploads are slow. The split outbounds depend on Cloudflare for uploads, so
+    they cannot be a fallback for it.
+  - Tested on a copy: normal (28 Cloudflare / 12 split YouTube requests), CloudFront
+    broken (all YouTube via Cloudflare), Cloudflare broken (everything via Gcore), Gcore
+    broken (no change).
+- **Health checks:** `burstObservatory` pings every `exit-*` and `yt-*` outbound once a
+  minute; unhealthy ones drop out of the balancers until they recover.
+- With a single CDN, drop the extra outbounds, the observatory and the balancers, and
+  route to `exit-cdn` directly.
+- **Sniffing** (`routeOnly`) reads the domain from TLS/QUIC so phone clients in TUN
+  mode, which send only IPs, still match the YouTube rule.
 - **The CDN hostname is pinned** to the zone's IPs (`.env`), so the relay never sends
   a plain-text DNS query for it.
 
