@@ -96,12 +96,19 @@ The DuckDNS token can edit every name in that DuckDNS account, so keep the accou
 this only. It lives on the exit, which is fine: whoever controls the exit already
 controls the traffic.
 
-## 5. Second CDN: CloudFront over WebSocket
+## 5. More CDNs: CloudFront (download legs) and Gcore (WebSocket fallback)
 
-CloudFront withholds and buffers streaming responses, so xhttp stalls through it (all
-modes, gRPC on or off). WebSocket passes through cleanly, so the CloudFront path uses
-its own inbound on port `8444` (published in `docker-compose.yml`, covered by the
-firewall via `PORTS="8443 8444"`):
+From the relay's datacenter, uploads to every foreign CDN except Cloudflare are
+throttled (~0.2 MB/s), while downloads from them run at full speed. So:
+
+- **CloudFront** points at the xhttp inbound (`8443`) and carries only the **download
+  half** of split connections (the relay's `yt-split-*` outbounds upload via
+  Cloudflare). CloudFront withholds an *idle* xhttp download stream, but streams it
+  fine once data flows: 21 MB/s, 32/32 page loads in testing.
+- **Gcore** buffers xhttp download streams (stalls after ~300 KB), so it can only carry
+  WebSocket. It is the relay's fallback when Cloudflare fails, via its own inbound on
+  `8444` (published in `docker-compose.yml`, covered by the firewall via
+  `PORTS="8443 8444"`):
 
 ```json
 {
@@ -121,7 +128,7 @@ CloudFront distribution:
 
 | Setting | Value |
 |---|---|
-| Origin domain | the dynDNS name (`ACME_DOMAIN`), HTTPS only, port **8444** |
+| Origin domain | the dynDNS name (`ACME_DOMAIN`), HTTPS only, port **8443** |
 | Origin response / keep-alive timeout | 60 s |
 | Viewer protocol | HTTPS only; HTTP/2 and HTTP/3 on |
 | Allowed methods | all |
@@ -129,9 +136,14 @@ CloudFront distribution:
 | Origin request policy | **AllViewerExceptHostHeader** (forwarding Host breaks origin TLS: 502) |
 | Compression, WAF, logging | off |
 
-From Russia, uploads to CloudFront are throttled (about 0.1–0.25 MB/s, while the same
-path from outside Russia does 15 MB/s), so treat it as an emergency fallback; the relay
-only switches to it when the Cloudflare path fails its health check.
+**Gcore** resource: origin = the dynDNS name, HTTPS, port `8444`, WebSockets option on,
+no caching, no compression, no rewrites; leave "query string forwarding" off (it is a
+video-playlist feature). `update-ranges.sh` includes Gcore's published lists
+(`public-net-list` + `public-ip-list`, ~1,300 ranges); the firewall therefore checks
+only new connections.
+
+Origin changes in either CDN can take several minutes to reach all edges; until then
+requests may hit the old port (the exit answers 404 for paths it does not serve).
 
 ## Notes
 
