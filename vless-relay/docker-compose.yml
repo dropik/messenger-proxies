@@ -5,6 +5,9 @@ services:
     restart: unless-stopped
     ports:
       - "443:443/tcp"
+      # monitoring (monitoring/relay): localhost only
+      - "127.0.0.1:10809:10809/tcp"   # monitor-in: vmagent pushes metrics through the tunnel
+      - "127.0.0.1:11111:11111/tcp"   # Xray metrics endpoint
     volumes:
       - ./config.json:/etc/xray/config.json:ro
     extra_hosts:

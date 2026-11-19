@@ -1,11 +1,12 @@
 #!/bin/sh
 # Refresh the CDN address ranges allowed to reach the exit ports, then reapply the
 # firewall. Sources: Cloudflare's published list, AWS ip-ranges.json (service
-# CLOUDFRONT_ORIGIN_FACING) and Gcore's public CDN address lists. Run as root;
-# re-run when a CDN announces new ranges. CDNS selects which ones to include.
+# CLOUDFRONT_ORIGIN_FACING) and, optionally, Gcore's public CDN address lists (no longer
+# used by default; add "gcore" to CDNS to include them). Run as root; re-run when a CDN
+# announces new ranges. CDNS selects which ones to include.
 set -e
 OUT="${RANGES:-/etc/cdn-only-firewall/ips-v4}"
-CDNS="${CDNS:-cloudflare cloudfront gcore}"
+CDNS="${CDNS:-cloudflare cloudfront}"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 

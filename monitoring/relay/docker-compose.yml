@@ -1,0 +1,53 @@
+# Monitoring agents on the relay. Everything listens on 127.0.0.1 only (the relay has no
+# host firewall). No metrics are stored here beyond vmagent's outage buffer: they are
+# pushed through the tunnel to the exit.
+name: monitoring
+
+volumes:
+  vmagent-data:
+
+services:
+  vmagent:
+    image: victoriametrics/vmagent:v1.155.0
+    container_name: mon-vmagent
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -promscrape.config=/etc/vmagent/scrape.yml
+      # Sent through the relay's localhost-only "monitor-in" inbound; the exit's Xray
+      # redirects the monitoring user to VictoriaMetrics, so the host name is arbitrary.
+      - -remoteWrite.url=http://victoriametrics/api/v1/write
+      - -remoteWrite.proxyURL=http://127.0.0.1:10809
+      - -remoteWrite.tmpDataPath=/vmagent-data
+      - -remoteWrite.maxDiskUsagePerURL=500MB
+      - -httpListenAddr=127.0.0.1:8429
+    volumes:
+      - vmagent-data:/vmagent-data
+      - ./vmagent/scrape.yml:/etc/vmagent/scrape.yml:ro
+    mem_limit: 150m
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: mon-node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=127.0.0.1:9100
+      - --collector.textfile.directory=/textfile
+    volumes:
+      - /:/host:ro,rslave
+      - /var/lib/node_exporter/textfile:/textfile:ro
+    mem_limit: 60m
+
+  # A real Xray client that connects to the relay's public address, like users do.
+  # Its config is generated on the relay (make-probe-client.py) and holds secrets.
+  probe:
+    image: teddysun/xray:26.10.31
+    container_name: mon-probe
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /etc/monitoring/probe-client.json:/etc/xray/config.json:ro
+    mem_limit: 80m
