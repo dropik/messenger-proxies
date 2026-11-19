@@ -1,0 +1,113 @@
+# Monitoring stack on the exit. Nothing here is reachable from the internet:
+# VictoriaMetrics and Grafana publish only on 127.0.0.1 (use an SSH tunnel), node_exporter
+# listens only on the monitoring bridge's gateway address.
+name: monitoring
+
+networks:
+  monitoring:
+    name: monitoring
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-mon
+    ipam:
+      config:
+        - subnet: 10.213.0.0/24
+          gateway: 10.213.0.1
+
+volumes:
+  vm-data:
+  am-data:
+  grafana-data:
+
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.155.0
+    container_name: mon-victoriametrics
+    restart: unless-stopped
+    command:
+      - -storageDataPath=/storage
+      - -retentionPeriod=30d
+      - -promscrape.config=/etc/vm/scrape.yml
+      - -httpListenAddr=:8428
+    volumes:
+      - vm-data:/storage
+      - ./victoriametrics/scrape.yml:/etc/vm/scrape.yml:ro
+    ports:
+      - "127.0.0.1:8428:8428"
+    mem_limit: 400m
+    networks:
+      monitoring:
+        ipv4_address: 10.213.0.10   # the relay's monitoring user is redirected here by the exit's Xray
+
+  vmalert:
+    image: victoriametrics/vmalert:v1.155.0
+    container_name: mon-vmalert
+    restart: unless-stopped
+    command:
+      - -datasource.url=http://10.213.0.10:8428
+      - -remoteWrite.url=http://10.213.0.10:8428
+      - -remoteRead.url=http://10.213.0.10:8428
+      - -notifier.url=http://10.213.0.12:9093
+      - -rule=/etc/vmalert/*.yml
+      - -evaluationInterval=30s
+    volumes:
+      - ./vmalert:/etc/vmalert:ro
+    mem_limit: 100m
+    networks:
+      monitoring:
+        ipv4_address: 10.213.0.11
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.2
+    container_name: mon-alertmanager
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+      - am-data:/alertmanager
+    mem_limit: 100m
+    networks:
+      monitoring:
+        ipv4_address: 10.213.0.12
+
+  grafana:
+    image: grafana/grafana:13.2.5
+    container_name: mon-grafana
+    restart: unless-stopped
+    env_file: grafana.env            # GF_SECURITY_ADMIN_PASSWORD (gitignored)
+    environment:
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_NEWS_NEWS_FEED_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    mem_limit: 350m
+    networks:
+      monitoring:
+        ipv4_address: 10.213.0.13
+
+  node-exporter:
+    image: prom/node-exporter:v1.12.1
+    container_name: mon-node-exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --web.listen-address=10.213.0.1:9100
+      - --collector.textfile.directory=/textfile
+    volumes:
+      - /:/host:ro,rslave
+      - /var/lib/node_exporter/textfile:/textfile:ro
+    mem_limit: 60m
+    depends_on:
+      - victoriametrics   # makes compose create the monitoring bridge first

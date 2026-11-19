@@ -79,12 +79,12 @@
       }
     },
     {
-      "tag": "exit-gcore",
+      "tag": "exit-cfws",
       "protocol": "vless",
       "settings": {
         "vnext": [
           {
-            "address": "GCORE_HOSTNAME",
+            "address": "CLOUDFRONT_HOSTNAME",
             "port": 443,
             "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
           }
@@ -94,13 +94,13 @@
         "network": "ws",
         "security": "tls",
         "tlsSettings": {
-          "serverName": "GCORE_HOSTNAME",
+          "serverName": "CLOUDFRONT_HOSTNAME",
           "fingerprint": "chrome",
           "alpn": ["http/1.1"]
         },
         "wsSettings": {
           "path": "/WS_PATH",
-          "host": "GCORE_HOSTNAME"
+          "host": "CLOUDFRONT_HOSTNAME"
         }
       }
     },
@@ -213,13 +213,13 @@
       {
         "tag": "youtube",
         "selector": ["yt-"],
-        "fallbackTag": "exit-gcore",
+        "fallbackTag": "exit-cfws",
         "strategy": { "type": "roundRobin" }
       },
       {
         "tag": "rest",
         "selector": ["exit-cdn"],
-        "fallbackTag": "exit-gcore",
+        "fallbackTag": "exit-cfws",
         "strategy": { "type": "roundRobin" }
       }
     ],
