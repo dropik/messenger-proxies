@@ -34,8 +34,13 @@ sudo systemctl daemon-reload && sudo systemctl enable --now monitoring-collect.t
 The exit's Xray needs these changes (see `vless-exit/config.json.example`):
 - `stats`, `policy` and `metrics` (listening on `10.213.0.20:11111`)
 - a monitoring user
-- a `metrics` outbound that redirects to VictoriaMetrics
-- routing that blocks private addresses for everyone else
+- a `to-vm` outbound that redirects to VictoriaMetrics. **Don't name it `metrics`:** that is
+  the metrics service's own tag, and traffic sent to it lands in Xray's expvar handler instead.
+- a `finalRules` allow for exactly `10.213.0.10:8428`. Freedom in Xray 26.x blocks private
+  and reserved addresses by default for traffic from VLESS inbounds.
+- routing: the monitoring user's requests for the host `victoriametrics` go to `to-vm`. Its
+  other traffic (the relay's health checks) goes out normally. Private addresses are blocked
+  for everyone else.
 
 It also has to join the `monitoring` network at `10.213.0.20` (see `vless-exit/docker-compose.yml`).
 

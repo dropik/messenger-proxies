@@ -1,0 +1,8 @@
+[Unit]
+Description=End-to-end probe through the relay (writes node_exporter textfile metrics)
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/monitoring/probe.py --out /var/lib/node_exporter/textfile/probe.prom
+Nice=10

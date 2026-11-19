@@ -1,0 +1,63 @@
+// Connection lifecycle events for TCP sockets with local port 443 (the relay's client side).
+// Output goes to classifier.py's pipe only, never to disk. One line per event:
+//   O <sk> <raddr> <rport>                                  connection established
+//   S <raddr> <rport> <ttl>                                 SYN arrived (TTL baseline)
+//   R <sk> <ttl> <state>                                    reset received (its TTL, socket state)
+//   E <sk> <how> <err> <idle_rcv_j> <idle_snd_j> <retransmits> <probes_out> <raddr> <rport>
+//     how: P = peer closed first (FIN), L = relay closed first, C = aborted (see err:
+//     104 reset, 110 timeout), idle_*: jiffies since last receive/send. retransmits > 0 on
+//     a timeout means data was stuck; probes_out > 0 means keepalive probes went unanswered.
+//     (packets_out is useless here: the kernel purges the send queue before the state change.)
+
+config = { missing_probes = "ignore" }
+
+BEGIN { printf("READY\n"); }
+
+tracepoint:sock:inet_sock_set_state
+/args.protocol == 6 && args.sport == 443/
+{
+  $sk = (struct sock *)args.skaddr;
+  if (args.newstate == 1 && args.oldstate == 3) {            // SYN_RECV -> ESTABLISHED
+    if (args.family == 2) {
+      printf("O %llx %s %d\n", args.skaddr, ntop(args.daddr), args.dport);
+    } else {
+      printf("O %llx %s %d\n", args.skaddr, ntop(args.daddr_v6), args.dport);
+    }
+  }
+  if (args.oldstate == 1 && (args.newstate == 8 || args.newstate == 4 || args.newstate == 7)) {
+    $tp = (struct tcp_sock *)args.skaddr;
+    $ic = (struct inet_connection_sock *)args.skaddr;
+    $how = args.newstate == 8 ? "P" : (args.newstate == 4 ? "L" : "C");
+    if (args.family == 2) {
+      printf("E %llx %s %d %u %u %u %u %s %d\n", args.skaddr, $how, $sk->sk_err,
+             (uint32)jiffies - $tp->rcv_tstamp, (uint32)jiffies - $tp->lsndtime,
+             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr), args.dport);
+    } else {
+      printf("E %llx %s %d %u %u %u %u %s %d\n", args.skaddr, $how, $sk->sk_err,
+             (uint32)jiffies - $tp->rcv_tstamp, (uint32)jiffies - $tp->lsndtime,
+             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr_v6), args.dport);
+    }
+  }
+}
+
+kprobe:tcp_conn_request
+{
+  $skb = (struct sk_buff *)arg3;
+  $iph = (struct iphdr *)($skb->head + $skb->network_header);
+  if ($iph->version == 4) {
+    $th = (struct tcphdr *)($skb->head + $skb->transport_header);
+    if (bswap($th->dest) == 443) {
+      printf("S %s %d %d\n", ntop($iph->saddr), bswap($th->source), $iph->ttl);
+    }
+  }
+}
+
+kprobe:tcp_reset
+{
+  $sk = (struct sock *)arg0;
+  if ($sk->__sk_common.skc_num == 443) {
+    $skb = (struct sk_buff *)arg1;
+    $iph = (struct iphdr *)($skb->head + $skb->network_header);
+    printf("R %llx %d %d\n", arg0, $iph->version == 4 ? $iph->ttl : 0, $sk->__sk_common.skc_state);
+  }
+}

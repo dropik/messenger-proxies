@@ -6,7 +6,7 @@ services:
     ports:
       # Reached only through the CDNs; firewall/ restricts both ports to CDN ranges.
       - "8443:8443/tcp"   # Cloudflare and CloudFront (xhttp)
-      - "8444:8444/tcp"   # Gcore (WebSocket); drop if you only use one CDN
+      - "8444:8444/tcp"   # CloudFront WebSocket fallback (second origin + path behavior)
     volumes:
       - ./config.json:/etc/xray/config.json:ro
       - ./certs:/etc/xray/certs:ro

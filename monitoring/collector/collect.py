@@ -9,6 +9,10 @@ Collects, all optional:
   --log NAME=CONTAINER=RE  cumulative count of container log lines matching RE.
                            Only counts are kept; log lines are never stored.
   --file-age NAME=PATH     modification time of a file.
+  --sockets NAME=CONTAINER=PORT
+                           totals over the container's established TCP connections on PORT
+                           (open, silent 30+ min, waiting on unacknowledged data, with a
+                           keepalive timer). No addresses are kept.
 
 Runs from a systemd timer (as root, for docker and the certificates). Writes atomically.
 """
@@ -108,6 +112,39 @@ def collect_cert(out, name, path):
     out.add("cert_read_error", 1, "Certificate could not be read", name=name)
 
 
+def collect_sockets(out, name, container, port):
+    pid = run(["docker", "inspect", "-f", "{{.State.Pid}}", container]).stdout.strip()
+    if not pid.isdigit() or pid == "0":
+        return
+    r = run(["nsenter", "-t", pid, "-n", "ss", "-Htino", "state", "established",
+             f"( sport = :{port} )"])
+    if r.returncode != 0:
+        return
+    n = silent = unacked = backoff = keepalive = 0
+    for line in r.stdout.splitlines():
+        if not line.startswith(("\t", " ")):          # connection line (info lines are indented)
+            n += 1
+            if "timer:(keepalive" in line:
+                keepalive += 1
+            continue
+        rcv = re.search(r"lastrcv:(\d+)", line)
+        snd = re.search(r"lastsnd:(\d+)", line)
+        if rcv and snd and int(rcv.group(1)) > 1_800_000 and int(snd.group(1)) > 1_800_000:
+            silent += 1
+        if "unacked:" in line:
+            unacked += 1
+        if "backoff:" in line:
+            backoff += 1
+    for metric, v, h in (
+        ("tcp_conns_established", n, "Established TCP connections"),
+        ("tcp_conns_silent_30m", silent, "Connections with nothing sent or received for 30+ min"),
+        ("tcp_conns_unacked", unacked, "Connections with data waiting for acknowledgement"),
+        ("tcp_conns_backoff", backoff, "Connections in retransmission backoff (peer not answering)"),
+        ("tcp_conns_keepalive_timer", keepalive, "Connections with a keepalive timer"),
+    ):
+        out.add(metric, v, h, name=name, port=port)
+
+
 def collect_logs(out, specs, state):
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     by_container = {}
@@ -142,6 +179,7 @@ def main():
     p.add_argument("--cert", action="append", default=[])
     p.add_argument("--log", action="append", default=[])
     p.add_argument("--file-age", action="append", default=[])
+    p.add_argument("--sockets", action="append", default=[])
     a = p.parse_args()
 
     t0 = time.time()
@@ -157,6 +195,8 @@ def main():
     for s in a.cert:
         collect_cert(out, *split2(s, 2))
     collect_logs(out, [split2(s, 3) for s in a.log], state)
+    for s in a.sockets:
+        collect_sockets(out, *split2(s, 3))
     for s in a.file_age:
         name, path = split2(s, 2)
         if os.path.exists(path):

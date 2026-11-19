@@ -72,10 +72,13 @@
       }
     },
     {
-      "tag": "metrics",
+      "tag": "to-vm",
       "protocol": "freedom",
       "settings": {
-        "redirect": "10.213.0.10:8428"
+        "redirect": "10.213.0.10:8428",
+        "finalRules": [
+          { "action": "allow", "network": "tcp", "ip": ["10.213.0.10/32"], "port": "8428" }
+        ]
       }
     },
     {
@@ -89,7 +92,8 @@
       {
         "type": "field",
         "user": ["monitor@cdn"],
-        "outboundTag": "metrics"
+        "domain": ["full:victoriametrics"],
+        "outboundTag": "to-vm"
       },
       {
         "type": "field",

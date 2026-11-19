@@ -1,0 +1,16 @@
+[Unit]
+Description=Disconnect classifier (kernel TCP events on the relay's port 443, totals only)
+After=docker.service
+Requires=docker.service
+
+[Service]
+# CLASSIFIER_ARGS=--exclude <relay public address>   (the probe connects from there)
+EnvironmentFile=/etc/monitoring/classifier.env
+ExecStart=/usr/bin/python3 /usr/local/lib/monitoring/classifier/classifier.py --bt /usr/local/lib/monitoring/classifier/conn-events.bt --out /var/lib/node_exporter/textfile/classifier.prom $CLASSIFIER_ARGS
+Restart=always
+RestartSec=10
+# stdout carries nothing per client unless --debug-client is set; keep it out of the journal anyway
+StandardOutput=null
+
+[Install]
+WantedBy=multi-user.target

@@ -30,7 +30,7 @@ The relay can't reach the exit's IP (it's blocked from Russia), and the exit mus
 - **vmagent on the relay** collects local metrics and sends them over the existing CDN path, through a localhost-only Xray inbound on the relay. It buffers on disk during outages and resends later.
 - **On the exit:**
   - The relay uses a **separate monitoring UUID**. Only that user may reach the metrics store, which sits at a fixed address on the exit's Docker network.
-  - **Add a rule: private addresses (`geoip:private`) are blocked for all other traffic.** Today user traffic could reach the exit's private Docker addresses.
+  - **Private addresses (`geoip:private`) are blocked for all other traffic.** Xray 26.x's freedom outbound already blocks private and reserved addresses by default for traffic from VLESS inbounds, so this rule is a second layer. It also stops such requests at routing, before any DNS lookup.
 - **Dead man's switch:** no data from the relay for 5 minutes → alert.
 
 ### C. Probes (on the relay, against itself)
@@ -121,6 +121,23 @@ The classifier's labels are a hypothesis until measured. **Until stages 1 and 2 
 - delay until detection
 - grouping errors: one disconnect split into several, or two clients merged into one
 
+**Results (2026-11-19, Linux Xray client, `monitoring/relay/classifier/lab.sh`):**
+
+| Scenario | Label | Correct |
+|---|---|---|
+| killed during a download (S4) | reset_active | 3/3 |
+| stopped during a download (S2) | client_closed | 3/3 (never reset_active) |
+| stopped or killed while idle (S1, S3) | client_closed | 6/6 (the two can't be told apart) |
+| network cut while idle (S5) | vanished, ~122 s after the cut | 7/7 |
+| network cut during a download (S6) | stalled | 1/1 |
+
+What the lab corrected:
+- **A client closing almost always ends in a reset after its FIN**, because the relay is still writing. So "reset after FIN" doesn't mean the client was interrupted mid-transfer. Only a reset while the connection is still fully open does.
+- **The unacknowledged-data count is useless at that point:** the kernel purges the send queue before the state change. Retransmit and keepalive-probe counters are used instead.
+- **The speed-test server refuses single downloads over 25 MB,** so the first round's "downloading" scenarios weren't downloading at all.
+
+Not tested yet: forged resets (S7/S8), carrier-grade NAT, and how a real iPhone ends its connections (stage 2).
+
 ### Stage 2: real phones, ground truth from people
 
 - **On a willing iPhone with v2RayTun, and one Android phone,** each action 5 times with the time noted to the second:
@@ -161,7 +178,7 @@ The classifier's labels are a hypothesis until measured. **Until stages 1 and 2 
    - one Xray restart
 2. **Relay:**
    - Xray: metrics, stats and API on localhost, a localhost monitoring inbound, keepalive options, a probe user
-   - Xray: block private addresses (`geoip:private`) for user traffic. The relay's routing has no such rule either.
+   - Xray: block private addresses (`geoip:private`, `geosite:private`) for user traffic. This is a second layer on top of freedom's default policy.
    - compose: the keepalive setting
    - install bpftrace, node_exporter and vmagent
    - one restart, at night

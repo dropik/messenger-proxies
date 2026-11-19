@@ -1,0 +1,72 @@
+groups:
+  - name: relay
+    rules:
+      # vmagent pushes through the tunnel; if nothing arrives, either the relay or every
+      # path behind it is down. (vmagent buffers and resends once the path is back.)
+      - alert: RelayDataMissing
+        expr: absent_over_time(up{job="node", host="relay"}[5m])
+        labels: { severity: critical }
+        annotations: { summary: "Relay: no metrics for 5 minutes (relay down or all tunnel paths down)" }
+
+      - alert: ProbeForwardFailing
+        expr: max_over_time(probe_success{group="forward", target="generate_204"}[3m]) == 0
+        labels: { severity: critical }
+        annotations: { summary: "Relay probe: forward group cannot fetch a test page for 3+ minutes" }
+
+      - alert: ProbeDirectFailing
+        expr: max_over_time(probe_success{group="direct", target="generate_204"}[3m]) == 0
+        labels: { severity: critical }
+        annotations: { summary: "Relay probe: direct group cannot fetch a test page for 3+ minutes" }
+
+      - alert: ProbeTargetFailing
+        expr: max_over_time(probe_success[15m]) == 0
+        labels: { severity: warning }
+        annotations: { summary: "Relay probe: {{ $labels.group }} -> {{ $labels.target }} failing for 15 minutes" }
+
+      - alert: ProbeStale
+        expr: time() - probe_last_run_timestamp_seconds > 300
+        labels: { severity: warning }
+        annotations: { summary: "Relay probe has not run for 5+ minutes" }
+
+      - alert: ProbeSlow
+        expr: max_over_time(probe_download_bytes_per_second{group="forward"}[45m]) < 1000000
+        labels: { severity: warning }
+        annotations: { summary: "Relay probe: forward download under 1 MB/s for 45 minutes (throttling?)" }
+
+      - alert: AllExitPathsDown
+        expr: max(xray_observatory_alive{host="relay", tag=~"exit-.*"}) == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "Relay: Cloudflare and the CloudFront fallback both failing health checks" }
+
+      - alert: CloudflarePathDown
+        expr: xray_observatory_alive{host="relay", tag="exit-cdn"} == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: Cloudflare path down for 5+ minutes, users are on the fallback" }
+
+      - alert: FallbackPathDown
+        expr: xray_observatory_alive{host="relay", tag="exit-cfws"} == 0
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: CloudFront WebSocket fallback failing for 15+ minutes (no failover if Cloudflare goes)" }
+
+      - alert: SplitPathDown
+        expr: max(xray_observatory_alive{host="relay", tag=~"yt-split-.*"}) == 0
+        for: 15m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: CloudFront download legs failing for 15+ minutes (YouTube all on Cloudflare)" }
+
+      # The classifier's labels are shown on dashboards only (see PHASE1.md) until checked
+      # against real phones; only its own health alerts.
+      - alert: ClassifierStale
+        expr: time() - classifier_last_update_timestamp_seconds > 180
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: disconnect classifier not updating (bpftrace or service down)" }
+
+      - alert: ConntrackHigh
+        expr: node_nf_conntrack_entries / node_nf_conntrack_entries_limit > 0.8
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: connection tracking table over 80%" }

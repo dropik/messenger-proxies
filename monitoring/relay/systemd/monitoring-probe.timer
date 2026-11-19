@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the end-to-end probe every minute
+
+[Timer]
+OnBootSec=60s
+OnCalendar=*:*:15
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target

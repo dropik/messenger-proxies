@@ -96,7 +96,7 @@ The DuckDNS token can edit every name in that DuckDNS account, so keep the accou
 this only. It lives on the exit, which is fine: whoever controls the exit already
 controls the traffic.
 
-## 5. More CDNs: CloudFront (download legs) and Gcore (WebSocket fallback)
+## 5. Second CDN: CloudFront (download legs and WebSocket fallback)
 
 From the relay's datacenter, uploads to every foreign CDN except Cloudflare are
 throttled (~0.2 MB/s), while downloads from them run at full speed. So:
@@ -139,15 +139,16 @@ CloudFront distribution:
 | Cache policy | CachingDisabled |
 | Origin request policy | **AllViewerExceptHostHeader** (forwarding Host breaks origin TLS: 502) |
 | Compression, WAF, logging | off |
+| Second origin (WebSocket fallback) | the same dynDNS name, HTTPS only, port **8444**, same timeouts, **origin path empty** |
+| Behavior for the fallback | path pattern = `/WS_PATH`, that origin, GET/HEAD, CachingDisabled, AllViewerExceptHostHeader, no compression |
 
-**Gcore** resource: origin = the dynDNS name, HTTPS, port `8444`, WebSockets option on,
-no caching, no compression, no rewrites; leave "query string forwarding" off (it is a
-video-playlist feature). `update-ranges.sh` includes Gcore's published lists
-(`public-net-list` + `public-ip-list`, ~1,300 ranges); the firewall therefore checks
-only new connections.
+Gcore (removed): it was the WebSocket fallback until TLS to its edge was blocked from the
+relay's datacenter on 2026-11-18. `update-ranges.sh` can still add its ~1,300 ranges with
+`CDNS="cloudflare cloudfront gcore"`.
 
-Origin changes in either CDN can take several minutes to reach all edges; until then
-requests may hit the old port (the exit answers 404 for paths it does not serve).
+The firewall checks only new connections, so a list change doesn't touch established ones.
+Origin changes in CloudFront can take several minutes to reach all edges. Until then,
+requests may hit the old port; the exit answers 404 for paths it doesn't serve.
 
 ## Notes
 
