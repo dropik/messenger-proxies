@@ -45,7 +45,9 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
     clone more or fewer to change the ratio (Xray balancers have no weights). This moves
     about 30% of YouTube's bytes onto CloudFront.
   - Everything else: Cloudflare (`exit-cdn`).
-  - Fallback for both: `exit-gcore` (Gcore, WebSocket on the exit's `8444`). Page loads
+  - Fallback for both: `exit-cfws` (CloudFront, WebSocket on the exit's `8444`, routed by a
+    path behavior in the same distribution). Gcore did this until 2026-11-18, when TLS to its
+    edge address was blocked from the relay's datacenter. Page loads
     work, uploads are slow. The split outbounds depend on Cloudflare for uploads, so
     they cannot be a fallback for it.
   - Tested on a copy: normal (28 Cloudflare / 12 split YouTube requests), CloudFront

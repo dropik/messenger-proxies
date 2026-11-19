@@ -4,11 +4,19 @@ services:
     container_name: vless-exit
     restart: unless-stopped
     ports:
-      # Reached only through the CDN; firewall/ restricts it to CDN ranges.
-      - "8443:8443/tcp"   # Cloudflare (xhttp)
-      - "8444:8444/tcp"   # CloudFront (WebSocket); drop if you only use one CDN
+      # Reached only through the CDNs; firewall/ restricts both ports to CDN ranges.
+      - "8443:8443/tcp"   # Cloudflare and CloudFront (xhttp)
+      - "8444:8444/tcp"   # Gcore (WebSocket); drop if you only use one CDN
     volumes:
       - ./config.json:/etc/xray/config.json:ro
       - ./certs:/etc/xray/certs:ro
     environment:
       - TZ=UTC
+    networks:
+      default:
+      monitoring:                   # created by monitoring/exit; drop this if you don't run it
+        ipv4_address: 10.213.0.20   # Xray's metrics endpoint listens here
+
+networks:
+  monitoring:
+    external: true

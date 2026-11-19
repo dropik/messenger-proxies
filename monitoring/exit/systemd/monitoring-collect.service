@@ -1,0 +1,9 @@
+[Unit]
+Description=Write host metrics for node_exporter (Xray, containers, certificates, log counts)
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/monitoring/collect.env
+ExecStart=/usr/bin/python3 /usr/local/lib/monitoring/collect.py --out /var/lib/node_exporter/textfile/host.prom --state /var/lib/monitoring/collect-state.json $COLLECT_ARGS
+Nice=10

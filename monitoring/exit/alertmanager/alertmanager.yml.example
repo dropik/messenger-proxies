@@ -1,0 +1,35 @@
+# Copy to alertmanager.yml (gitignored). Until the secrets exist, use the "null" receiver
+# version at the bottom.
+#
+# Secrets, in alertmanager/secrets/ (gitignored, chmod 600, readable by uid 65534):
+#   telegram_token   bot token from @BotFather
+#   healthchecks_url ping URL of a healthchecks.io check (period 5 min, grace 5 min)
+route:
+  receiver: telegram
+  group_by: [alertname, host]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 6h
+  routes:
+    - matchers: [ 'alertname="Watchdog"' ]
+      receiver: heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 2m
+
+receivers:
+  - name: telegram
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/secrets/telegram_token
+        chat_id: 0            # your numeric chat id with the bot
+        send_resolved: true
+  - name: heartbeat
+    webhook_configs:
+      - url_file: /etc/alertmanager/secrets/healthchecks_url
+        send_resolved: false
+
+# --- "null" version, before the bot and the heartbeat exist ---
+# route:
+#   receiver: "null"
+# receivers:
+#   - name: "null"

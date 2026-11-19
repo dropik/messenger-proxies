@@ -1,0 +1,20 @@
+global:
+  scrape_interval: 30s
+
+scrape_configs:
+  - job_name: node
+    static_configs:
+      - targets: ["10.213.0.1:9100"]
+        labels: { host: exit }
+  - job_name: victoriametrics
+    static_configs:
+      - targets: ["localhost:8428"]
+        labels: { host: exit }
+  - job_name: vmalert
+    static_configs:
+      - targets: ["10.213.0.11:8880"]
+        labels: { host: exit }
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["10.213.0.12:9093"]
+        labels: { host: exit }

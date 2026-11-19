@@ -105,10 +105,14 @@ throttled (~0.2 MB/s), while downloads from them run at full speed. So:
   half** of split connections (the relay's `yt-split-*` outbounds upload via
   Cloudflare). CloudFront withholds an *idle* xhttp download stream, but streams it
   fine once data flows: 21 MB/s, 32/32 page loads in testing.
-- **Gcore** buffers xhttp download streams (stalls after ~300 KB), so it can only carry
-  WebSocket. It is the relay's fallback when Cloudflare fails, via its own inbound on
-  `8444` (published in `docker-compose.yml`, covered by the firewall via
-  `PORTS="8443 8444"`):
+- **The fallback when Cloudflare fails is WebSocket through the same CloudFront
+  distribution:** a second origin (the same dynDNS name, port `8444`) and a behavior whose
+  path pattern is the WebSocket path. The inbound on `8444` is published in
+  `docker-compose.yml` and covered by the firewall via `PORTS="8443 8444"`. Measured from the
+  relay: about 3 MB/s down, 2 MB/s up.
+  Gcore carried it until 2026-11-18, when TLS to its edge address was blocked from the
+  relay's datacenter. Gcore also buffers xhttp download streams (stalls after ~300 KB), so it
+  could only ever carry WebSocket.
 
 ```json
 {

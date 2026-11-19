@@ -1,0 +1,72 @@
+groups:
+  - name: meta
+    rules:
+      # Always firing. Alertmanager forwards it to the outside heartbeat check, so a dead
+      # monitoring host (or a broken alert chain) is noticed.
+      - alert: Watchdog
+        expr: vector(1)
+        labels: { severity: none }
+        annotations: { summary: "Alert chain is alive" }
+
+  - name: exit
+    rules:
+      - alert: ExitNodeExporterDown
+        expr: up{job="node", host="exit"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "Exit: node_exporter not scraped" }
+
+      - alert: CollectorStale
+        expr: time() - collector_last_run_timestamp_seconds > 180
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: metrics collector has not run for 3+ minutes" }
+
+      - alert: XrayMetricsDown
+        expr: xray_up == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }}: Xray ({{ $labels.xray }}) not answering" }
+
+      - alert: ContainerNotRunning
+        expr: container_running == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations: { summary: "{{ $labels.host }}: container {{ $labels.name }} not running" }
+
+      - alert: ContainerRestarted
+        expr: changes(container_started_time_seconds[10m]) > 0
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: container {{ $labels.name }} restarted (all its connections dropped)" }
+
+      - alert: HostRebooted
+        expr: node_time_seconds - node_boot_time_seconds < 900   # boot time itself jitters
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: host rebooted" }
+
+      - alert: CertificateExpiring
+        expr: cert_not_after_seconds - time() < 14 * 86400
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: certificate {{ $labels.name }} expires in under 14 days" }
+
+      - alert: DiskAlmostFull
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: root disk over 85% full" }
+
+      - alert: MemoryLow
+        expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes < 0.15
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: under 15% memory available" }
+
+      - alert: ExitDnsErrors
+        expr: increase(log_matches_total{name="xray_dns_error", host="exit"}[15m]) > 50
+        labels: { severity: warning }
+        annotations: { summary: "Exit: {{ $value | humanize }} DNS errors in 15 minutes" }
+
+      - alert: FirewallRangesStale
+        expr: time() - file_mtime_seconds{name="cdn_ranges"} > 35 * 86400
+        labels: { severity: warning }
+        annotations: { summary: "Exit: CDN ranges in the firewall not refreshed for 35+ days" }

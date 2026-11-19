@@ -10,6 +10,19 @@
     ],
     "queryStrategy": "UseIPv4"
   },
+  "stats": {},
+  "metrics": {
+    "tag": "metrics",
+    "listen": "10.213.0.20:11111"
+  },
+  "policy": {
+    "system": {
+      "statsInboundUplink": true,
+      "statsInboundDownlink": true,
+      "statsOutboundUplink": true,
+      "statsOutboundDownlink": true
+    }
+  },
   "inbounds": [
     {
       "tag": "cdn-in",
@@ -20,6 +33,10 @@
           {
             "id": "RELAY_UUID",
             "email": "relay@cdn"
+          },
+          {
+            "id": "MONITOR_UUID",
+            "email": "monitor@cdn"
           }
         ],
         "decryption": "none"
@@ -55,12 +72,30 @@
       }
     },
     {
+      "tag": "metrics",
+      "protocol": "freedom",
+      "settings": {
+        "redirect": "10.213.0.10:8428"
+      }
+    },
+    {
       "tag": "block",
       "protocol": "blackhole"
     }
   ],
   "routing": {
+    "domainStrategy": "IPIfNonMatch",
     "rules": [
+      {
+        "type": "field",
+        "user": ["monitor@cdn"],
+        "outboundTag": "metrics"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "block"
+      },
       {
         "type": "field",
         "network": "tcp,udp",
