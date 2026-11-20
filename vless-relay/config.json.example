@@ -74,7 +74,8 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
-          "mode": "stream-up"
+          "mode": "stream-up",
+          "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
       }
     },
@@ -126,7 +127,8 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
-          "mode": "stream-up"
+          "mode": "stream-up",
+          "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
       }
     },
@@ -152,7 +154,8 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
-          "mode": "stream-up"
+          "mode": "stream-up",
+          "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
       }
     },
@@ -179,6 +182,7 @@
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
           "mode": "stream-up",
+          "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" },
           "downloadSettings": {
             "address": "CLOUDFRONT_HOSTNAME",
             "port": 443,
