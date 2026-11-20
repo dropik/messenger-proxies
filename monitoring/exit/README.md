@@ -59,9 +59,28 @@ within a few seconds. The datasource is recreated on every start so its uid stay
 
 ## Access
 
+**Tailscale (normal way).** The exit is in your tailnet as `monitor`, and Tailscale serves
+Grafana there over plain HTTP. That's fine because the tailnet itself is encrypted
+end to end. Nothing listens publicly. From any device logged in to your Tailscale account,
+open `http://monitor`; the user is `admin` and the password is in `grafana.env`.
+
+```bash
+# on the exit, once (Tailscale from pkgs.tailscale.com)
+sudo tailscale up --hostname=monitor --accept-dns=false     # approve the link it prints
+sudo tailscale serve --bg --http=80 http://127.0.0.1:3000  # persists across reboots
+```
+
+In the Tailscale admin console, **disable key expiry** for `monitor`. Otherwise it drops
+out of the tailnet after 180 days.
+
+Tailscale adds its own `ts-input` iptables chain ahead of ufw: it accepts traffic arriving
+on `tailscale0` and UDP 41641 (direct connections). So tailnet devices can reach the exit,
+while the public firewall is unchanged.
+
+**SSH tunnel (fallback, also for raw queries):**
+
 ```bash
 ssh -L 3000:127.0.0.1:3000 -L 8428:127.0.0.1:8428 debian@EXIT_IP
 ```
 
-Then open `http://localhost:3000` (Grafana; the user is `admin`, the password is in
-`grafana.env`) or `http://localhost:8428/vmui` (raw queries).
+Then open `http://localhost:3000` (Grafana) or `http://localhost:8428/vmui` (raw queries).
