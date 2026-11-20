@@ -25,7 +25,9 @@ TARGETS = {
         "yandex": "https://ya.ru/",
     },
 }
-SPEED_URL = "https://speed.cloudflare.com/__down?bytes=10000000"
+# OVH's test file. speed.cloudflare.com answers HTTP 429 once an address has fetched too
+# often, and it refuses single downloads over 25 MB.
+SPEED_URL = "https://proof.ovh.net/files/10Mb.dat"
 
 
 def curl(proxy, url, timeout):
@@ -64,8 +66,12 @@ def main():
     speed_file = a.out + ".speed"
     if time.gmtime().tm_min % a.speed_every == 0 or not os.path.exists(speed_file):
         code, _, bps = curl(GROUPS["forward"], SPEED_URL, 60)
-        with open(speed_file, "w") as f:
-            f.write(f"{bps if code == 200 else 0} {int(time.time())}\n")
+        lines += ["# HELP probe_download_ok Last speed test got the file (HTTP 200)",
+                  "# TYPE probe_download_ok gauge", f'probe_download_ok{{group="forward"}} {1 if code == 200 else 0}']
+        # A refused or failed download is not a speed: keep the previous value then.
+        if code == 200 or not os.path.exists(speed_file):
+            with open(speed_file, "w") as f:
+                f.write(f"{bps if code == 200 else 0} {int(time.time())}\n")
     try:
         bps, ts = open(speed_file).read().split()
         lines += [

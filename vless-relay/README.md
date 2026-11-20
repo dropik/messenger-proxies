@@ -31,6 +31,11 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
 - **No access log.** Xray's access log would record every user's home IP next to the
   sites they visit, on a server under Russian jurisdiction. `"access": "none"` keeps
   only warnings and errors; turn it on briefly when debugging (see Checks).
+- **The Cloudflare outbounds rotate their connections every 10–15 minutes** (`xmux`: 4–8
+  streams per connection, 200–400 requests or 600–900 s per connection). On 2026-11-20 the
+  probe showed some long-lived pooled connections dropping to 0.2–3 MB/s, while fresh
+  connections over the same path ran at 9–18 MB/s. Xray's default rotation (30–50 min)
+  let a degraded connection serve requests for too long.
 - **From this datacenter, uploads to every foreign CDN except Cloudflare are throttled**
   (~0.2 MB/s to CloudFront and Gcore; downloads from them run at full speed). So
   Cloudflare carries all uploads, and other CDNs only ever carry download data.
