@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: vpn
+    folder: VPN
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false        # edit build_dashboard.py instead, then redeploy
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
