@@ -50,6 +50,13 @@ Create a bot with @BotFather, send it a message, and find your chat id. Then fil
 `alertmanager/secrets/telegram_token`, `chat_id` and the healthchecks.io ping URL, switch
 `alertmanager.yml` to the full version, and run `docker compose restart alertmanager`.
 
+## Dashboard
+
+"VPN overview" (folder VPN) is provisioned read-only from
+`grafana/provisioning/dashboards/json/vpn.json`. That file is generated: edit
+`grafana/build_dashboard.py`, run it, copy the JSON to the exit, and Grafana picks it up
+within a few seconds. The datasource is recreated on every start so its uid stays `vm`.
+
 ## Access
 
 ```bash
