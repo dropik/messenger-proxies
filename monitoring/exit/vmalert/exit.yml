@@ -44,6 +44,13 @@ groups:
         labels: { severity: warning }
         annotations: { summary: "{{ $labels.host }}: host rebooted" }
 
+      # unattended-upgrades installs security updates but never reboots; a new kernel creates
+      # /var/run/reboot-required. Rebooting the relay drops every client for about a minute.
+      - alert: HostRebootRequired
+        expr: time() - file_mtime_seconds{name="reboot_required"} > 2 * 86400
+        labels: { severity: warning }
+        annotations: { summary: "{{ $labels.host }}: updates installed 2+ days ago wait for a reboot" }
+
       - alert: CertificateExpiring
         expr: cert_not_after_seconds - time() < 14 * 86400
         labels: { severity: warning }

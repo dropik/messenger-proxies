@@ -150,6 +150,28 @@ The firewall checks only new connections, so a list change doesn't touch establi
 Origin changes in CloudFront can take several minutes to reach all edges. Until then,
 requests may hit the old port; the exit answers 404 for paths it doesn't serve.
 
+## 6. Host hardening
+
+Same on the relay. Keys only for SSH: the drop-in sorts first because sshd keeps the
+first value it reads, ahead of any provider files that enable passwords. Check that a key
+login works before closing the current session.
+
+```bash
+printf 'PasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n' \
+  | sudo tee /etc/ssh/sshd_config.d/00-hardening.conf && sudo sshd -t && sudo systemctl reload ssh
+```
+
+Debian security and point-release updates install daily via `unattended-upgrades` (Debian's
+own repositories only, so Docker and Tailscale never update on their own), without
+rebooting. A kernel update leaves `/var/run/reboot-required`; the `HostRebootRequired`
+alert fires after two days, and the reboot is done by hand.
+
+```bash
+sudo apt-get install -y unattended-upgrades
+printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' \
+  | sudo tee /etc/apt/apt.conf.d/20auto-upgrades
+```
+
 ## Notes
 
 - Xray resolves destinations itself over DNS-over-HTTPS (`dns` block), not through

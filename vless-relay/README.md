@@ -97,6 +97,9 @@ openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
 docker compose up -d
 ```
 
+Harden the host as for the exit ([key-only SSH, automatic security updates](../vless-exit/README.md#6-host-hardening)).
+Rebooting the relay drops every client for about a minute, so pick a quiet hour.
+
 ## Client link
 
 ```
