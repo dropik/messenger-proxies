@@ -1,0 +1,11 @@
+{{/* Telegram message, parse_mode HTML. One line pair per alert in the group. */}}
+{{ define "telegram.vpn" -}}
+{{ range .Alerts.Firing -}}
+{{ if eq .Labels.severity "critical" }}🔴{{ else }}🟠{{ end }} <b>{{ .Labels.alertname }}</b> · since {{ .StartsAt.UTC.Format "15:04" }} UTC
+{{ .Annotations.summary | html }}
+{{ end -}}
+{{ range .Alerts.Resolved -}}
+✅ <b>{{ .Labels.alertname }}</b> resolved · {{ .StartsAt.UTC.Format "15:04" }}–{{ .EndsAt.UTC.Format "15:04" }} UTC
+{{ .Annotations.summary | html }}
+{{ end -}}
+{{- end }}

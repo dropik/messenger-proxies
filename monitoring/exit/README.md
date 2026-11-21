@@ -46,9 +46,25 @@ It also has to join the `monitoring` network at `10.213.0.20` (see `vless-exit/d
 
 ## Alerts
 
-Create a bot with @BotFather, send it a message, and find your chat id. Then fill
-`alertmanager/secrets/telegram_token`, `chat_id` and the healthchecks.io ping URL, switch
-`alertmanager.yml` to the full version, and run `docker compose restart alertmanager`.
+Alerts go to a Telegram bot: critical ones with sound, warnings silently, each with a
+"resolved" follow-up. The message format is `alertmanager/telegram.tmpl`.
+
+1. Create a bot with @BotFather (`/newbot`) and send it any message.
+2. Put the token on the exit without it landing in shell history:
+   ```bash
+   cd monitoring/exit/alertmanager && umask 077 && mkdir -p secrets
+   read -rsp "Bot token: " t; echo; printf %s "$t" | sudo tee secrets/telegram_token >/dev/null; unset t
+   sudo chown debian:65534 secrets && sudo chmod 750 secrets
+   sudo chown root:65534 secrets/telegram_token && sudo chmod 640 secrets/telegram_token
+   ```
+3. Find the chat id: `getUpdates` on the bot lists the chat you wrote from. Copy
+   `alertmanager.yml.example` to `alertmanager.yml`, set both `chat_id`s, and run
+   `docker compose restart alertmanager`.
+4. Test: `docker exec mon-alertmanager amtool --alertmanager.url=http://127.0.0.1:9093 alert add alertname=Test severity=critical`.
+
+The Watchdog alert goes nowhere until a healthchecks.io check exists (see the comment in
+the example). Without it, nothing notices if the exit itself goes down, because
+Alertmanager runs there too.
 
 ## Dashboard
 
