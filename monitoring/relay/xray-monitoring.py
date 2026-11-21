@@ -5,8 +5,8 @@ Adds:
 - stats and a metrics endpoint (0.0.0.0:11111 in the container; compose publishes it on
   127.0.0.1 only)
 - "monitor-in": a localhost-only HTTP proxy inbound (port 10809) that vmagent uses to push
-  metrics. It goes out via mon-cdn (Cloudflare) with mon-cfws (CloudFront WebSocket) as
-  fallback, as the exit's monitoring user.
+  metrics. It goes out via mon-cdn* (Cloudflare, one copy of each exit-cdn* outbound) with
+  mon-cfws (CloudFront WebSocket) as fallback, as the exit's monitoring user.
 - probe users: probe@relay (routed like forward) and probe-direct@relay (routed like direct)
 - TCP keepalive on the client inbound: detect vanished clients in about 2 minutes
 - private destinations (geoip:private, geosite:private) blocked for client traffic
@@ -48,7 +48,9 @@ c["inbounds"] = [i for i in c["inbounds"] if i["tag"] != "monitor-in"] + [
 
 ob = {o["tag"]: o for o in c["outbounds"]}
 mons = []
-for src, tag in (("exit-cdn", "mon-cdn"), ("exit-cfws", "mon-cfws")):
+# One monitoring twin per Cloudflare outbound (exit-cdn, exit-cdn-2 on the second address, ...).
+pairs = [(t, "mon-" + t[len("exit-"):]) for t in ob if t.startswith("exit-cdn")] + [("exit-cfws", "mon-cfws")]
+for src, tag in pairs:
     o = copy.deepcopy(ob[src])
     o["tag"] = tag
     o["settings"]["vnext"][0]["users"] = [{"id": mon_id, "encryption": "none"}]

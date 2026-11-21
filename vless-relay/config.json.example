@@ -74,6 +74,35 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
+          "host": "CDN_HOSTNAME",
+          "mode": "stream-up",
+          "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
+        }
+      }
+    },
+    {
+      "tag": "exit-cdn-2",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "CDN_IP_2",
+            "port": 443,
+            "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "xhttp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "CDN_HOSTNAME",
+          "fingerprint": "chrome",
+          "alpn": ["h2"]
+        },
+        "xhttpSettings": {
+          "path": "/XHTTP_PATH",
+          "host": "CDN_HOSTNAME",
           "mode": "stream-up",
           "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
@@ -127,6 +156,7 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
+          "host": "CDN_HOSTNAME",
           "mode": "stream-up",
           "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
@@ -138,7 +168,7 @@
       "settings": {
         "vnext": [
           {
-            "address": "CDN_HOSTNAME",
+            "address": "CDN_IP_2",
             "port": 443,
             "users": [{ "id": "RELAY_UUID", "encryption": "none" }]
           }
@@ -154,6 +184,7 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
+          "host": "CDN_HOSTNAME",
           "mode": "stream-up",
           "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" }
         }
@@ -181,6 +212,7 @@
         },
         "xhttpSettings": {
           "path": "/XHTTP_PATH",
+          "host": "CDN_HOSTNAME",
           "mode": "stream-up",
           "xmux": { "maxConcurrency": "4-8", "hMaxRequestTimes": "200-400", "hMaxReusableSecs": "600-900" },
           "downloadSettings": {

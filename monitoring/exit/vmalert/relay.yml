@@ -40,10 +40,24 @@ groups:
         annotations: { summary: "Relay: Cloudflare and the CloudFront fallback both failing health checks" }
 
       - alert: CloudflarePathDown
-        expr: xray_observatory_alive{host="relay", tag="exit-cdn"} == 0
+        expr: max(xray_observatory_alive{host="relay", tag=~"exit-cdn.*"}) == 0
         for: 5m
         labels: { severity: warning }
         annotations: { summary: "Relay: Cloudflare path down for 5+ minutes, users are on the fallback" }
+
+      # exit-cdn dials the zone's first IP, exit-cdn-2 the second; the balancer uses whichever works.
+      - alert: CloudflareAddressDown
+        expr: min(xray_observatory_alive{host="relay", tag=~"exit-cdn.*"}) == 0 and max(xray_observatory_alive{host="relay", tag=~"exit-cdn.*"}) == 1
+        for: 30m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: one of Cloudflare's two addresses failing health checks for 30+ minutes" }
+
+      # Connections to Cloudflare stuck with unacknowledged data (see the TCP panels).
+      - alert: CloudflareConnectionsStuck
+        expr: sum(tcp_peer_stuck_conns{host="relay", name=~"cloudflare-.*"}) > 0
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "Relay: connections to Cloudflare keep getting stuck (10+ minutes)" }
 
       - alert: FallbackPathDown
         expr: xray_observatory_alive{host="relay", tag="exit-cfws"} == 0

@@ -240,7 +240,7 @@
    "type": "stat",
    "title": "Cloudflare",
    "id": 4,
-   "description": "Relay health check through Cloudflare, the main path.",
+   "description": "Relay health check through Cloudflare, the main path (UP if either of the zone's two addresses works).",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -257,7 +257,7 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "xray_observatory_alive{host=\"relay\",tag=\"exit-cdn\"}",
+     "expr": "max(xray_observatory_alive{host=\"relay\",tag=~\"exit-cdn.*\"})",
      "legendFormat": "",
      "refId": "A",
      "instant": true,
@@ -583,7 +583,7 @@
    "type": "stat",
    "title": "Speed",
    "id": 8,
-   "description": "Probe download speed: 10 MB through forward, every 15 minutes.",
+   "description": "Probe download speed: 10 MB through forward, every 15 minutes, transfer phase only (connection setup excluded; see the probe row for both).",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -600,7 +600,7 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "probe_download_bytes_per_second{host=\"relay\",group=\"forward\"}",
+     "expr": "probe_download_transfer_bytes_per_second{host=\"relay\",group=\"forward\"}",
      "legendFormat": "",
      "refId": "A",
      "instant": true,
@@ -831,7 +831,7 @@
    "type": "timeseries",
    "title": "Health check response time",
    "id": 12,
-   "description": "",
+   "description": "Every Cloudflare outbound has its own connections. A gap between fastest and slowest means single connections are stalling while others work.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -848,9 +848,21 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "xray_observatory_delay_ms{host=\"relay\",tag=\"exit-cdn\"}",
-     "legendFormat": "Cloudflare",
+     "expr": "min(xray_observatory_delay_ms{host=\"relay\",tag=~\"exit-cdn.*|yt-cf-.*\"} > 0)",
+     "legendFormat": "Cloudflare, fastest",
      "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "max(xray_observatory_delay_ms{host=\"relay\",tag=~\"exit-cdn.*|yt-cf-.*\"})",
+     "legendFormat": "Cloudflare, slowest",
+     "refId": "B",
      "instant": false,
      "range": true,
      "format": "time_series"
@@ -862,7 +874,7 @@
      },
      "expr": "xray_observatory_delay_ms{host=\"relay\",tag=\"exit-cfws\"}",
      "legendFormat": "CloudFront fallback",
-     "refId": "B",
+     "refId": "C",
      "instant": false,
      "range": true,
      "format": "time_series"
@@ -874,7 +886,7 @@
      },
      "expr": "xray_observatory_delay_ms{host=\"relay\",tag=\"yt-split-1\"}",
      "legendFormat": "CloudFront split",
-     "refId": "C",
+     "refId": "D",
      "instant": false,
      "range": true,
      "format": "time_series"
@@ -917,7 +929,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "Cloudflare"
+       "options": "Cloudflare, fastest"
       },
       "properties": [
        {
@@ -932,7 +944,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "CloudFront fallback"
+       "options": "Cloudflare, slowest"
       },
       "properties": [
        {
@@ -947,7 +959,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "CloudFront split"
+       "options": "CloudFront fallback"
       },
       "properties": [
        {
@@ -955,6 +967,21 @@
         "value": {
          "mode": "fixed",
          "fixedColor": "#199e70"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "CloudFront split"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#c98500"
         }
        }
       ]
@@ -1199,7 +1226,7 @@
    "type": "timeseries",
    "title": "Download speed (forward, every 15 min)",
    "id": 16,
-   "description": "",
+   "description": "10 MB through forward. The file is short, so connection setup (~0.3 s) weighs heavily on the setup-included figure.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -1216,9 +1243,21 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "probe_download_bytes_per_second{host=\"relay\",group=\"forward\"}",
-     "legendFormat": "forward",
+     "expr": "probe_download_transfer_bytes_per_second{host=\"relay\",group=\"forward\"}",
+     "legendFormat": "transfer",
      "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "probe_download_bytes_per_second{host=\"relay\",group=\"forward\"}",
+     "legendFormat": "setup included",
+     "refId": "B",
      "instant": false,
      "range": true,
      "format": "time_series"
@@ -1261,7 +1300,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "forward"
+       "options": "transfer"
       },
       "properties": [
        {
@@ -1272,13 +1311,28 @@
         }
        }
       ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "setup included"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d95926"
+        }
+       }
+      ]
      }
     ]
    }
   },
   {
    "type": "row",
-   "title": "Traffic through the relay",
+   "title": "TCP: relay → Cloudflare, exit ← CDNs (every 30 s)",
    "id": 17,
    "collapsed": false,
    "gridPos": {
@@ -1291,16 +1345,16 @@
   },
   {
    "type": "timeseries",
-   "title": "Download to users, by path",
+   "title": "Stuck connections",
    "id": 18,
-   "description": "Bytes per second per outbound group on the relay (5-minute average).",
+   "description": "cloudflare-1/2: the relay's connections to each of the zone's addresses. from-cdns: the exit's connections from Cloudflare and CloudFront. Stuck = sent data unacknowledged for 2+ s.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
    },
    "gridPos": {
     "h": 8,
-    "w": 12,
+    "w": 8,
     "x": 0,
     "y": 24
    },
@@ -1310,7 +1364,524 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "sum(rate(xray_traffic_bytes_total{host=\"relay\",kind=\"outbound\",direction=\"downlink\",tag=~\"exit-cdn|yt-cf-.*\"}[5m]))",
+     "expr": "tcp_peer_stuck_conns",
+     "legendFormat": "{{name}}: unacked 2+ s",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "tcp_peer_backoff_conns",
+     "legendFormat": "{{name}}: backoff",
+     "refId": "B",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#3987e5"
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: unacked 2+ s"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#3987e5"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: unacked 2+ s"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d95926"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: unacked 2+ s"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#199e70"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: backoff"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#c98500"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: backoff"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d55181"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: backoff"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#0ca30c"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Loss signals per minute",
+   "id": 19,
+   "description": "Retransmits = loss on the way out; out of order in = loss on the way in. Loss on the relay's side and clean exit = the problem is between the relay and Cloudflare.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 8,
+    "y": 24
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "60 * rate(tcp_peer_retrans_segments_total[5m])",
+     "legendFormat": "{{name}}: retransmits",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "60 * rate(tcp_peer_rcv_ooo_packets_total[5m])",
+     "legendFormat": "{{name}}: out of order in",
+     "refId": "B",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#3987e5"
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: retransmits"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#3987e5"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: retransmits"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d95926"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: retransmits"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#199e70"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: out of order in"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#c98500"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: out of order in"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d55181"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: out of order in"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#0ca30c"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "RTT",
+   "id": 20,
+   "description": "",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 8,
+    "x": 16,
+    "y": 24
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "tcp_peer_rtt_median_ms",
+     "legendFormat": "{{name}}: median",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "tcp_peer_rtt_max_ms",
+     "legendFormat": "{{name}}: max",
+     "refId": "B",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#3987e5"
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: median"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#3987e5"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: median"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d95926"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: median"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#199e70"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-1: max"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#c98500"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "cloudflare-2: max"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#d55181"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "from-cdns: max"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#0ca30c"
+        }
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "type": "row",
+   "title": "Traffic through the relay",
+   "id": 21,
+   "collapsed": false,
+   "gridPos": {
+    "h": 1,
+    "w": 24,
+    "x": 0,
+    "y": 32
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "title": "Download to users, by path",
+   "id": 22,
+   "description": "Bytes per second per outbound group on the relay (5-minute average).",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 33
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "sum(rate(xray_traffic_bytes_total{host=\"relay\",kind=\"outbound\",direction=\"downlink\",tag=~\"exit-cdn.*|yt-cf-.*\"}[5m]))",
      "legendFormat": "Cloudflare",
      "refId": "A",
      "instant": false,
@@ -1454,7 +2025,7 @@
   {
    "type": "timeseries",
    "title": "Upload from users, by path",
-   "id": 19,
+   "id": 23,
    "description": "Bytes per second per outbound group on the relay (5-minute average).",
    "datasource": {
     "type": "prometheus",
@@ -1464,7 +2035,7 @@
     "h": 8,
     "w": 12,
     "x": 12,
-    "y": 24
+    "y": 33
    },
    "targets": [
     {
@@ -1472,7 +2043,7 @@
       "type": "prometheus",
       "uid": "vm"
      },
-     "expr": "sum(rate(xray_traffic_bytes_total{host=\"relay\",kind=\"outbound\",direction=\"uplink\",tag=~\"exit-cdn|yt-cf-.*\"}[5m]))",
+     "expr": "sum(rate(xray_traffic_bytes_total{host=\"relay\",kind=\"outbound\",direction=\"uplink\",tag=~\"exit-cdn.*|yt-cf-.*\"}[5m]))",
      "legendFormat": "Cloudflare",
      "refId": "A",
      "instant": false,
@@ -1616,20 +2187,20 @@
   {
    "type": "row",
    "title": "Clients and disconnects",
-   "id": 20,
+   "id": 24,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 32
+    "y": 41
    },
    "panels": []
   },
   {
    "type": "timeseries",
    "title": "Disconnects per hour, by how they ended",
-   "id": 21,
+   "id": 25,
    "description": "A disconnect = a client address with no connection for 10 s. client_closed: VPN off / app stopped. vanished: network gone (~2 min to detect). reset_active: app killed during traffic. stalled: path broke during traffic. Lab-checked on a Linux client only; see PHASE1.md.",
    "datasource": {
     "type": "prometheus",
@@ -1639,7 +2210,7 @@
     "h": 8,
     "w": 12,
     "x": 0,
-    "y": 33
+    "y": 42
    },
    "targets": [
     {
@@ -1802,7 +2373,7 @@
   {
    "type": "timeseries",
    "title": "Client connections on 443",
-   "id": 22,
+   "id": 26,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -1812,7 +2383,7 @@
     "h": 8,
     "w": 8,
     "x": 12,
-    "y": 33
+    "y": 42
    },
    "targets": [
     {
@@ -1937,7 +2508,7 @@
   {
    "type": "stat",
    "title": "Clients connected",
-   "id": 23,
+   "id": 27,
    "description": "Distinct client addresses with an open connection right now (probe excluded).",
    "datasource": {
     "type": "prometheus",
@@ -1947,7 +2518,7 @@
     "h": 8,
     "w": 4,
     "x": 20,
-    "y": 33
+    "y": 42
    },
    "targets": [
     {
@@ -2001,20 +2572,20 @@
   {
    "type": "row",
    "title": "Servers",
-   "id": 24,
+   "id": 28,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 41
+    "y": 50
    },
    "panels": []
   },
   {
    "type": "timeseries",
    "title": "CPU busy",
-   "id": 25,
+   "id": 29,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2024,7 +2595,7 @@
     "h": 8,
     "w": 6,
     "x": 0,
-    "y": 42
+    "y": 51
    },
    "targets": [
     {
@@ -2110,7 +2681,7 @@
   {
    "type": "timeseries",
    "title": "Memory available",
-   "id": 26,
+   "id": 30,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2120,7 +2691,7 @@
     "h": 8,
     "w": 6,
     "x": 6,
-    "y": 42
+    "y": 51
    },
    "targets": [
     {
@@ -2206,7 +2777,7 @@
   {
    "type": "timeseries",
    "title": "Xray memory (Go heap)",
-   "id": 27,
+   "id": 31,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2216,7 +2787,7 @@
     "h": 8,
     "w": 6,
     "x": 12,
-    "y": 42
+    "y": 51
    },
    "targets": [
     {
@@ -2302,7 +2873,7 @@
   {
    "type": "timeseries",
    "title": "Errors per hour",
-   "id": 28,
+   "id": 32,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2312,7 +2883,7 @@
     "h": 8,
     "w": 6,
     "x": 18,
-    "y": 42
+    "y": 51
    },
    "targets": [
     {
@@ -2410,7 +2981,7 @@
   {
    "type": "stat",
    "title": "Disk used: relay",
-   "id": 29,
+   "id": 33,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2420,7 +2991,7 @@
     "h": 4,
     "w": 4,
     "x": 0,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2483,7 +3054,7 @@
   {
    "type": "stat",
    "title": "Disk used: exit",
-   "id": 30,
+   "id": 34,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2493,7 +3064,7 @@
     "h": 4,
     "w": 4,
     "x": 4,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2556,7 +3127,7 @@
   {
    "type": "stat",
    "title": "Let's Encrypt cert",
-   "id": 31,
+   "id": 35,
    "description": "Days until the origin certificate CloudFront checks expires (renewed daily).",
    "datasource": {
     "type": "prometheus",
@@ -2566,7 +3137,7 @@
     "h": 4,
     "w": 4,
     "x": 8,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2629,7 +3200,7 @@
   {
    "type": "stat",
    "title": "Cloudflare origin cert",
-   "id": 32,
+   "id": 36,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2639,7 +3210,7 @@
     "h": 4,
     "w": 4,
     "x": 12,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2702,7 +3273,7 @@
   {
    "type": "stat",
    "title": "CDN ranges age",
-   "id": 33,
+   "id": 37,
    "description": "Days since the exit firewall's CDN address list was refreshed (update-ranges.sh).",
    "datasource": {
     "type": "prometheus",
@@ -2712,7 +3283,7 @@
     "h": 4,
     "w": 4,
     "x": 16,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2775,7 +3346,7 @@
   {
    "type": "stat",
    "title": "Monitoring push path",
-   "id": 34,
+   "id": 38,
    "description": "At least one path for the relay's metrics is up.",
    "datasource": {
     "type": "prometheus",
@@ -2785,7 +3356,7 @@
     "h": 4,
     "w": 4,
     "x": 20,
-    "y": 50
+    "y": 59
    },
    "targets": [
     {
@@ -2865,20 +3436,20 @@
   {
    "type": "row",
    "title": "Alerts firing now",
-   "id": 35,
+   "id": 39,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 54
+    "y": 63
    },
    "panels": []
   },
   {
    "type": "table",
    "title": "Firing alerts",
-   "id": 36,
+   "id": 40,
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -2887,7 +3458,7 @@
     "h": 5,
     "w": 24,
     "x": 0,
-    "y": 55
+    "y": 64
    },
    "targets": [
     {

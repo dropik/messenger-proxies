@@ -13,10 +13,19 @@ Collects, all optional:
                            totals over the container's established TCP connections on PORT
                            (open, silent 30+ min, waiting on unacknowledged data, with a
                            keepalive timer). No addresses are kept.
+  --peers NAME=CONTAINER=MATCH[,MATCH...]
+                           TCP health of the container's established connections matching any
+                           MATCH (dst:IP, dport:PORT or sport:PORT; no spaces, so the option
+                           survives systemd's word splitting): connections, stuck ones, RTT,
+                           and counters of retransmits, out-of-order packets and bytes. For the
+                           relay's connections to Cloudflare and the exit's from it. Sockets are
+                           tracked between runs by a hash; counts a socket gathers after the
+                           last run before it closes are lost, so the counters run slightly low.
 
 Runs from a systemd timer (as root, for docker and the certificates). Writes atomically.
 """
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -145,6 +154,76 @@ def collect_sockets(out, name, container, port):
         out.add(metric, v, h, name=name, port=port)
 
 
+PEER_COUNTERS = (  # ss -i field -> counter metric
+    ("retrans", "tcp_peer_retrans_segments_total", "Segments retransmitted (loss on the way out)"),
+    ("rcv_ooopack", "tcp_peer_rcv_ooo_packets_total", "Packets received out of order (loss on the way in)"),
+    ("segs_out", "tcp_peer_segs_out_total", "Segments sent"),
+    ("bytes_received", "tcp_peer_received_bytes_total", "Bytes received"),
+    ("bytes_acked", "tcp_peer_acked_bytes_total", "Bytes sent and acknowledged"),
+)
+
+
+def ss_filter(match):
+    terms = []
+    for m in match.split(","):
+        kind, _, val = m.partition(":")
+        if kind == "dst":
+            terms.append(f"dst {val}")
+        elif kind in ("dport", "sport"):
+            terms.append(f"{kind} = :{val}")
+        else:
+            sys.exit(f"bad --peers match: {m!r}")
+    return "( " + " or ".join(terms) + " )"
+
+
+def collect_peers(out, name, container, match, state):
+    pid = run(["docker", "inspect", "-f", "{{.State.Pid}}", container]).stdout.strip()
+    if not pid.isdigit() or pid == "0":
+        return
+    r = run(["nsenter", "-t", pid, "-n", "ss", "-Htin", "state", "established", ss_filter(match)])
+    if r.returncode != 0:
+        return
+    socks, cur = {}, None
+    for line in r.stdout.splitlines():
+        if not line.startswith(("\t", " ")):
+            f = line.split()
+            cur = hashlib.sha256(" ".join(f[-2:]).encode()).hexdigest()[:16]  # local + peer
+            socks[cur] = ""
+        elif cur:
+            socks[cur] += line
+    prev = state.get(f"peers:{name}", {})
+    totals = state.get(f"peer_totals:{name}", {})
+    now, rtts, stuck, backoff = {}, [], 0, 0
+    for key, info in socks.items():
+        vals = []
+        for field, _, _ in PEER_COUNTERS:
+            m = re.search(rf"\b{field}:(?:\d+/)?(\d+)", info)    # retrans:cur/total -> total
+            vals.append(int(m.group(1)) if m else 0)
+        old = prev.get(key, [0] * len(vals))
+        for (field, _, _), v, o in zip(PEER_COUNTERS, vals, old):
+            totals[field] = totals.get(field, 0) + max(v - o, 0)
+        now[key] = vals
+        m = re.search(r"\brtt:([\d.]+)", info)
+        if m:
+            rtts.append(float(m.group(1)))
+        if "backoff:" in info:
+            backoff += 1
+        ack = re.search(r"lastack:(\d+)", info)
+        if "unacked:" in info and ack and int(ack.group(1)) >= 2000:
+            stuck += 1
+    state[f"peers:{name}"] = now
+    state[f"peer_totals:{name}"] = totals
+    rtts.sort()
+    out.add("tcp_peer_conns", len(socks), "Established connections to/from these peers", name=name)
+    out.add("tcp_peer_stuck_conns", stuck, "Connections with sent data unacknowledged for 2+ s", name=name)
+    out.add("tcp_peer_backoff_conns", backoff, "Connections in retransmission backoff", name=name)
+    if rtts:
+        out.add("tcp_peer_rtt_median_ms", rtts[len(rtts) // 2], "Median smoothed RTT", name=name)
+        out.add("tcp_peer_rtt_max_ms", rtts[-1], "Highest smoothed RTT", name=name)
+    for field, metric, h in PEER_COUNTERS:
+        out.add(metric, totals.get(field, 0), h, "counter", name=name)
+
+
 def collect_logs(out, specs, state):
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     by_container = {}
@@ -180,6 +259,7 @@ def main():
     p.add_argument("--log", action="append", default=[])
     p.add_argument("--file-age", action="append", default=[])
     p.add_argument("--sockets", action="append", default=[])
+    p.add_argument("--peers", action="append", default=[])
     a = p.parse_args()
 
     t0 = time.time()
@@ -197,6 +277,8 @@ def main():
     collect_logs(out, [split2(s, 3) for s in a.log], state)
     for s in a.sockets:
         collect_sockets(out, *split2(s, 3))
+    for s in a.peers:
+        collect_peers(out, *split2(s, 3), state)
     for s in a.file_age:
         name, path = split2(s, 2)
         if os.path.exists(path):

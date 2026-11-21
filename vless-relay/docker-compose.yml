@@ -16,6 +16,12 @@ services:
       - "${CDN_HOSTNAME}:${CDN_IP_2}"
     environment:
       - TZ=UTC
+    # The container has its own network namespace, which does not inherit these from the
+    # host. BBR recovers faster from loss than cubic; without slow start after idle, a pooled
+    # connection keeps its speed between bursts. BBR needs the host module: see README.
+    sysctls:
+      - net.ipv4.tcp_congestion_control=bbr
+      - net.ipv4.tcp_slow_start_after_idle=0
     depends_on:
       - decoy
 

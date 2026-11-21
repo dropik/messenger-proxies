@@ -36,6 +36,19 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
   probe showed some long-lived pooled connections dropping to 0.2–3 MB/s, while fresh
   connections over the same path ran at 9–18 MB/s. Xray's default rotation (30–50 min)
   let a degraded connection serve requests for too long.
+- **The Cloudflare outbounds are spread over both of the zone's IPs.** Xray only ever dials
+  the first address a pinned hostname resolves to, so those outbounds name the second IP
+  directly (`exit-cdn-2`, `yt-cf-2`, …), with `serverName` and xhttp `host` still set to the
+  CDN hostname. On 2026-11-21 the health checks showed single Cloudflare connections freezing
+  for 2–15 s while others to the same IP kept working; the `rest` balancer now has two
+  outbounds, so health checks can steer away from a bad one.
+- **TCP: BBR, no slow start after idle**, set in compose for the container's own network
+  namespace. The host needs the module and the matching defaults:
+  ```bash
+  echo tcp_bbr > /etc/modules-load.d/bbr.conf && modprobe tcp_bbr
+  printf 'net.core.default_qdisc = fq\nnet.ipv4.tcp_congestion_control = bbr\nnet.ipv4.tcp_slow_start_after_idle = 0\n' > /etc/sysctl.d/90-vpn-tcp.conf
+  sysctl --system && tc qdisc replace dev eth0 root fq
+  ```
 - **From this datacenter, uploads to every foreign CDN except Cloudflare are throttled**
   (~0.2 MB/s to CloudFront and Gcore; downloads from them run at full speed). So
   Cloudflare carries all uploads, and other CDNs only ever carry download data.
@@ -49,7 +62,7 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
     outbounds. The live relay uses 7 pure-Cloudflare clones and 3 split ones (~70/30);
     clone more or fewer to change the ratio (Xray balancers have no weights). This moves
     about 30% of YouTube's bytes onto CloudFront.
-  - Everything else: Cloudflare (`exit-cdn`).
+  - Everything else: Cloudflare (`exit-cdn` and `exit-cdn-2`, round-robin).
   - Fallback for both: `exit-cfws` (CloudFront, WebSocket on the exit's `8444`, routed by a
     path behavior in the same distribution). Gcore did this until 2026-11-18, when TLS to its
     edge address was blocked from the relay's datacenter. Page loads
@@ -74,7 +87,7 @@ docker run --rm teddysun/xray xray x25519     # -> REALITY_PRIVATE_KEY (+ public
 docker run --rm teddysun/xray xray uuid       # once per user group -> FORWARD_UUID, DIRECT_UUID
 openssl rand -hex 4                           # -> SHORT_ID
 openssl rand -hex 8                           # -> CLIENT_XHTTP_PATH
-cp config.json.example config.json            # fill placeholders; RELAY_UUID and XHTTP_PATH come from the exit
+cp config.json.example config.json            # fill placeholders; RELAY_UUID and XHTTP_PATH come from the exit, CDN_IP_2 from .env
 cp .env.example .env                          # CDN hostname + its two Cloudflare IPs
 
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes \
@@ -131,4 +144,5 @@ To see which user and outbound each connection takes while debugging, remove
 `docker logs vless-relay | grep accepted`, then put it back and recreate again (that
 also drops the logged lines).
 
-If the CDN's IPs for the zone ever change, update `.env` and run `docker compose up -d`.
+If the CDN's IPs for the zone ever change, update `.env` and the outbounds that name the
+second IP in `config.json`, then run `docker compose up -d`.

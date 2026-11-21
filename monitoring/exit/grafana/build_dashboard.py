@@ -113,8 +113,9 @@ stat("Forward", 'min(probe_success{host="relay",group="forward",target="generate
      desc="Probe: a real Xray client on the relay fetches a test page as the forward group, every minute.")
 stat("Direct", 'min(probe_success{host="relay",group="direct",target="generate_204"})', 3, 3,
      mappings=updown_mappings("OK", "FAILING"), desc="Probe as the direct group (exits in Russia).")
-stat("Cloudflare", 'xray_observatory_alive{host="relay",tag="exit-cdn"}', 6, 3,
-     mappings=updown_mappings(), desc="Relay health check through Cloudflare, the main path.")
+stat("Cloudflare", 'max(xray_observatory_alive{host="relay",tag=~"exit-cdn.*"})', 6, 3,
+     mappings=updown_mappings(), desc="Relay health check through Cloudflare, the main path (UP if either "
+     "of the zone's two addresses works).")
 stat("Fallback", 'xray_observatory_alive{host="relay",tag="exit-cfws"}', 9, 3,
      mappings=updown_mappings(), desc="CloudFront WebSocket fallback; takes over if Cloudflare fails.")
 stat("Split", 'min(xray_observatory_alive{host="relay",tag=~"yt-split-.*"})', 12, 3,
@@ -123,8 +124,9 @@ stat("Data age", 'time() - max(timestamp(up{host="relay",job="node"}))', 15, 3, 
      decimals=0, desc="Seconds since the relay's metrics last arrived at the exit through the tunnel.",
      thresholds={"mode": "absolute", "steps": [{"color": GOOD, "value": None},
                                                {"color": WARN, "value": 120}, {"color": CRIT, "value": 300}]})
-stat("Speed", 'probe_download_bytes_per_second{host="relay",group="forward"}', 18, 3,
-     unit="Bps", decimals=1, desc="Probe download speed: 10 MB through forward, every 15 minutes.",
+stat("Speed", 'probe_download_transfer_bytes_per_second{host="relay",group="forward"}', 18, 3,
+     unit="Bps", decimals=1, desc="Probe download speed: 10 MB through forward, every 15 minutes, transfer "
+     "phase only (connection setup excluded; see the probe row for both).",
      thresholds={"mode": "absolute", "steps": [{"color": CRIT, "value": None},
                                                {"color": WARN, "value": 1e6}, {"color": GOOD, "value": 3e6}]})
 stat("Alerts", 'count(ALERTS{alertstate="firing",alertname!="Watchdog"}) or vector(0)', 21, 3,
@@ -137,11 +139,15 @@ row("Paths (health checks from the relay, every minute)")
 state_timeline("Path health", 'xray_observatory_alive{host="relay",tag=~"exit-.*|yt-split-.*|mon-.*"}',
                "{{tag}}", 0, 12, desc="exit-cdn = Cloudflare, exit-cfws = CloudFront WebSocket fallback, "
                "yt-split-* = CloudFront download legs, mon-* = the monitoring push paths.")
+CF_TAGS = 'exit-cdn.*|yt-cf-.*'
 timeseries("Health check response time", [
-    target('xray_observatory_delay_ms{host="relay",tag="exit-cdn"}', "Cloudflare", ref="A"),
-    target('xray_observatory_delay_ms{host="relay",tag="exit-cfws"}', "CloudFront fallback", ref="B"),
-    target('xray_observatory_delay_ms{host="relay",tag="yt-split-1"}', "CloudFront split", ref="C")],
-    12, 12, unit="ms", names=["Cloudflare", "CloudFront fallback", "CloudFront split"])
+    target(f'min(xray_observatory_delay_ms{{host="relay",tag=~"{CF_TAGS}"}} > 0)', "Cloudflare, fastest", ref="A"),
+    target(f'max(xray_observatory_delay_ms{{host="relay",tag=~"{CF_TAGS}"}})', "Cloudflare, slowest", ref="B"),
+    target('xray_observatory_delay_ms{host="relay",tag="exit-cfws"}', "CloudFront fallback", ref="C"),
+    target('xray_observatory_delay_ms{host="relay",tag="yt-split-1"}', "CloudFront split", ref="D")],
+    12, 12, unit="ms", names=["Cloudflare, fastest", "Cloudflare, slowest", "CloudFront fallback", "CloudFront split"],
+    desc="Every Cloudflare outbound has its own connections. A gap between fastest and slowest means "
+         "single connections are stalling while others work.")
 nextrow(8)
 
 # ---------------------------------------------------------------- probe
@@ -152,13 +158,37 @@ timeseries("Page fetch time (forward)", [
     target('probe_duration_seconds{host="relay",group="forward"}', "{{target}}")],
     8, 8, unit="s", names=["generate_204", "youtube", "telegram", "instagram"])
 timeseries("Download speed (forward, every 15 min)", [
-    target('probe_download_bytes_per_second{host="relay",group="forward"}', "forward")],
-    16, 8, unit="Bps", names=["forward"])
+    target('probe_download_transfer_bytes_per_second{host="relay",group="forward"}', "transfer", ref="A"),
+    target('probe_download_bytes_per_second{host="relay",group="forward"}', "setup included", ref="B")],
+    16, 8, unit="Bps", names=["transfer", "setup included"],
+    desc="10 MB through forward. The file is short, so connection setup (~0.3 s) weighs heavily on "
+         "the setup-included figure.")
+nextrow(8)
+
+# ---------------------------------------------------------------- TCP to/from Cloudflare
+row("TCP: relay → Cloudflare, exit ← CDNs (every 30 s)")
+PEERS = ["cloudflare-1", "cloudflare-2", "from-cdns"]
+timeseries("Stuck connections", [
+    target('tcp_peer_stuck_conns', "{{name}}: unacked 2+ s", ref="A"),
+    target('tcp_peer_backoff_conns', "{{name}}: backoff", ref="B")],
+    0, 8, names=[f"{p}: {k}" for k in ("unacked 2+ s", "backoff") for p in PEERS],
+    desc="cloudflare-1/2: the relay's connections to each of the zone's addresses. from-cdns: the "
+         "exit's connections from Cloudflare and CloudFront. Stuck = sent data unacknowledged for 2+ s.")
+timeseries("Loss signals per minute", [
+    target('60 * rate(tcp_peer_retrans_segments_total[5m])', "{{name}}: retransmits", ref="A"),
+    target('60 * rate(tcp_peer_rcv_ooo_packets_total[5m])', "{{name}}: out of order in", ref="B")],
+    8, 8, names=[f"{p}: {k}" for k in ("retransmits", "out of order in") for p in PEERS],
+    desc="Retransmits = loss on the way out; out of order in = loss on the way in. Loss on the "
+         "relay's side and clean exit = the problem is between the relay and Cloudflare.")
+timeseries("RTT", [
+    target('tcp_peer_rtt_median_ms', "{{name}}: median", ref="A"),
+    target('tcp_peer_rtt_max_ms', "{{name}}: max", ref="B")],
+    16, 8, unit="ms", names=[f"{p}: {k}" for k in ("median", "max") for p in PEERS])
 nextrow(8)
 
 # ---------------------------------------------------------------- traffic
 row("Traffic through the relay")
-PATHS = [("Cloudflare", 'exit-cdn|yt-cf-.*'), ("CloudFront split", 'yt-split-.*'),
+PATHS = [("Cloudflare", CF_TAGS), ("CloudFront split", 'yt-split-.*'),
          ("CloudFront fallback", 'exit-cfws'), ("Direct (from Russia)", 'direct')]
 for i, (direction, title) in enumerate((("downlink", "Download to users, by path"),
                                         ("uplink", "Upload from users, by path"))):

@@ -30,17 +30,23 @@ TARGETS = {
 SPEED_URL = "https://proof.ovh.net/files/10Mb.dat"
 
 
-def curl(proxy, url, timeout):
-    """-> (http_code, seconds, bytes_per_second); code 0 means the request failed."""
+def curl(proxy, url, timeout, detail=False):
+    """-> (http_code, seconds, bytes_per_second); code 0 means the request failed.
+    detail=True adds (time_to_first_byte, transfer_bytes_per_second): the transfer phase alone,
+    without connection setup, which takes a large share of a short download."""
     r = subprocess.run(
         ["curl", "-s", "-o", "/dev/null", "--proxy", proxy, "--max-time", str(timeout),
-         "-w", "%{http_code} %{time_total} %{speed_download}", url],
+         "-w", "%{http_code} %{time_total} %{speed_download} %{time_starttransfer} %{size_download}", url],
         capture_output=True, text=True)
     try:
-        code, t, speed = r.stdout.split()
-        return int(code), float(t), float(speed)
+        code, t, speed, ttfb, size = r.stdout.split()
+        code, t, speed, ttfb, size = int(code), float(t), float(speed), float(ttfb), float(size)
     except ValueError:
-        return 0, float(timeout), 0.0
+        code, t, speed, ttfb, size = 0, float(timeout), 0.0, 0.0, 0.0
+    if not detail:
+        return code, t, speed
+    xfer = size / (t - ttfb) if t - ttfb > 0.001 else 0.0
+    return code, t, speed, ttfb, xfer
 
 
 def main():
@@ -65,19 +71,27 @@ def main():
     # The speed result is kept between runs so the gauge always has a value.
     speed_file = a.out + ".speed"
     if time.gmtime().tm_min % a.speed_every == 0 or not os.path.exists(speed_file):
-        code, _, bps = curl(GROUPS["forward"], SPEED_URL, 60)
+        code, _, bps, ttfb, xfer = curl(GROUPS["forward"], SPEED_URL, 60, detail=True)
         lines += ["# HELP probe_download_ok Last speed test got the file (HTTP 200)",
                   "# TYPE probe_download_ok gauge", f'probe_download_ok{{group="forward"}} {1 if code == 200 else 0}']
         # A refused or failed download is not a speed: keep the previous value then.
         if code == 200 or not os.path.exists(speed_file):
+            ok = code == 200
             with open(speed_file, "w") as f:
-                f.write(f"{bps if code == 200 else 0} {int(time.time())}\n")
+                f.write(f"{bps if ok else 0} {int(time.time())} {ttfb if ok else 0:.3f} {xfer if ok else 0:.0f}\n")
     try:
-        bps, ts = open(speed_file).read().split()
+        v = open(speed_file).read().split() + ["0", "0"]       # older files have two fields
+        bps, ts, ttfb, xfer = v[:4]
         lines += [
-            "# HELP probe_download_bytes_per_second 10 MB download speed through forward",
+            "# HELP probe_download_bytes_per_second 10 MB download speed through forward, setup included",
             "# TYPE probe_download_bytes_per_second gauge",
             f'probe_download_bytes_per_second{{group="forward"}} {bps}',
+            "# HELP probe_download_transfer_bytes_per_second Same download, transfer phase only",
+            "# TYPE probe_download_transfer_bytes_per_second gauge",
+            f'probe_download_transfer_bytes_per_second{{group="forward"}} {xfer}',
+            "# HELP probe_download_ttfb_seconds Same download, time to first byte",
+            "# TYPE probe_download_ttfb_seconds gauge",
+            f'probe_download_ttfb_seconds{{group="forward"}} {ttfb}',
             "# HELP probe_download_timestamp_seconds When the speed was last measured",
             "# TYPE probe_download_timestamp_seconds gauge",
             f'probe_download_timestamp_seconds{{group="forward"}} {ts}',
