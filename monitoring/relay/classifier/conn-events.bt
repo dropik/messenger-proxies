@@ -3,11 +3,13 @@
 //   O <sk> <raddr> <rport>                                  connection established
 //   S <raddr> <rport> <ttl>                                 SYN arrived (TTL baseline)
 //   R <sk> <ttl> <state>                                    reset received (its TTL, socket state)
-//   E <sk> <how> <err> <idle_rcv_j> <idle_snd_j> <retransmits> <probes_out> <raddr> <rport>
+//   E <sk> <how> <err> <idle_rcv_j> <idle_snd_j> <retransmits> <probes_out> <raddr> <rport> <rcvd> <acked> <rcvd> <acked>
 //     how: P = peer closed first (FIN), L = relay closed first, C = aborted (see err:
 //     104 reset, 110 timeout), idle_*: jiffies since last receive/send. retransmits > 0 on
 //     a timeout means data was stuck; probes_out > 0 means keepalive probes went unanswered.
 //     (packets_out is useless here: the kernel purges the send queue before the state change.)
+//     rcvd/acked: bytes received from / delivered to the peer over the connection's life.
+//     rcvd/acked: bytes received from / delivered to the peer over the connection's life.
 
 config = { missing_probes = "ignore" }
 
@@ -29,13 +31,15 @@ tracepoint:sock:inet_sock_set_state
     $ic = (struct inet_connection_sock *)args.skaddr;
     $how = args.newstate == 8 ? "P" : (args.newstate == 4 ? "L" : "C");
     if (args.family == 2) {
-      printf("E %llx %s %d %u %u %u %u %s %d\n", args.skaddr, $how, $sk->sk_err,
+      printf("E %llx %s %d %u %u %u %u %s %d %llu %llu\n", args.skaddr, $how, $sk->sk_err,
              (uint32)jiffies - $tp->rcv_tstamp, (uint32)jiffies - $tp->lsndtime,
-             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr), args.dport);
+             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr), args.dport,
+             $tp->bytes_received, $tp->bytes_acked);
     } else {
-      printf("E %llx %s %d %u %u %u %u %s %d\n", args.skaddr, $how, $sk->sk_err,
+      printf("E %llx %s %d %u %u %u %u %s %d %llu %llu\n", args.skaddr, $how, $sk->sk_err,
              (uint32)jiffies - $tp->rcv_tstamp, (uint32)jiffies - $tp->lsndtime,
-             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr_v6), args.dport);
+             $ic->icsk_retransmits, $ic->icsk_probes_out, ntop(args.daddr_v6), args.dport,
+             $tp->bytes_received, $tp->bytes_acked);
     }
   }
 }

@@ -16,6 +16,10 @@ if [ ! -x $L/xray ]; then
   id=$(docker create teddysun/xray:26.10.31); docker cp "$id:/usr/bin/xray" $L/xray >/dev/null; docker rm "$id" >/dev/null
 fi
 cp /etc/monitoring/probe-client.json $L/client.json; chmod 600 $L/client.json
+read -r RELAY SNI < <(python3 -c '
+import json, sys
+o = next(o for o in json.load(open(sys.argv[1]))["outbounds"] if o.get("protocol") == "vless")
+print(o["settings"]["vnext"][0]["address"], o["streamSettings"]["realitySettings"]["serverName"])' $L/client.json)
 
 cleanup() { kill $CLF 2>/dev/null; pkill -f "$L/xray" 2>/dev/null; ip netns del lab 2>/dev/null; ip link del veth-lab 2>/dev/null; }
 trap cleanup EXIT
@@ -34,8 +38,8 @@ sleep 8
 
 start_client() { $NS $L/xray run -c $L/client.json >/dev/null 2>&1 & CPID=$!; sleep 2
   for i in 1 2 3; do $NS curl -s -o /dev/null --max-time 10 --proxy http://127.0.0.1:18081 https://www.gstatic.com/generate_204; done; }
-# continuous download: the speed-test server refuses single requests over 25 MB (HTTP 403)
-download() { $NS bash -c 'while true; do curl -s -o /dev/null --max-time 20 --proxy http://127.0.0.1:18081 "https://speed.cloudflare.com/__down?bytes=25000000"; done' & DL=$!; sleep 3; }
+# continuous download (speed.cloudflare.com answers 429 to frequent fetches)
+download() { $NS bash -c 'while true; do curl -s -o /dev/null --max-time 20 --proxy http://127.0.0.1:18081 "https://proof.ovh.net/files/100Mb.dat"; done' & DL=$!; sleep 3; }
 settle() { sleep 16; }     # > classifier GRACE
 
 run() {  # name expected action
@@ -45,6 +49,11 @@ run() {  # name expected action
   "$@"
   settle
 }
+# What scanners do: fetch the decoy page with the real SNI, open and drop a bare TCP
+# connection, complete a TLS handshake without a request.
+s_scan()       { $NS curl -sk -o /dev/null --max-time 10 --resolve "$SNI:443:$RELAY" "https://$SNI/"
+                 $NS timeout 3 bash -c "exec 3<>/dev/tcp/$RELAY/443; sleep 1"
+                 $NS timeout 5 openssl s_client -connect "$RELAY:443" -servername "$SNI" </dev/null >/dev/null 2>&1; }
 s_term_idle()  { start_client; sleep 4; kill -TERM $CPID; wait $CPID 2>/dev/null; }
 s_term_dl()    { start_client; download; kill -TERM $CPID; wait $CPID 2>/dev/null; kill $DL 2>/dev/null; }
 s_kill_idle()  { start_client; sleep 4; kill -KILL $CPID; wait $CPID 2>/dev/null; }
@@ -55,6 +64,7 @@ s_drop_dl()    { start_client; download; $NS iptables -I INPUT -j DROP; $NS ipta
                  kill -KILL $CPID; wait $CPID 2>/dev/null; kill $DL 2>/dev/null; $NS iptables -F; }
 
 for i in $(seq $RUNS_FAST); do
+  run "S0 scanner"               "not a client" s_scan
   run "S1 stop, idle"            client_closed s_term_idle
   run "S2 stop, downloading"     client_closed s_term_dl
   run "S3 kill, idle"            client_closed s_kill_idle

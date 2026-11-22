@@ -2201,14 +2201,14 @@
    "type": "timeseries",
    "title": "Disconnects per hour, by how they ended",
    "id": 25,
-   "description": "A disconnect = a client address with no connection for 10 s. client_closed: VPN off / app stopped. vanished: network gone (~2 min to detect). reset_active: app killed during traffic. stalled: path broke during traffic. Lab-checked on a Linux client only; see PHASE1.md.",
+   "description": "A disconnect = a client address with no connection for 10 s. client_closed: VPN off / app stopped. vanished: network gone (~2 min to detect). reset_active: app killed during traffic. stalled: path broke during traffic. Real clients only (session moved 20 KB or held a connection 2+ min) since 2026-11-22; before that, scanners dominate. Lab-checked on a Linux client only; see PHASE1.md.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
    },
    "gridPos": {
     "h": 8,
-    "w": 12,
+    "w": 10,
     "x": 0,
     "y": 42
    },
@@ -2372,17 +2372,17 @@
   },
   {
    "type": "timeseries",
-   "title": "Client connections on 443",
+   "title": "Connections on 443",
    "id": 26,
-   "description": "",
+   "description": "All TCP connections on 443, scanners included.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
    },
    "gridPos": {
     "h": 8,
-    "w": 8,
-    "x": 12,
+    "w": 6,
+    "x": 10,
     "y": 42
    },
    "targets": [
@@ -2506,10 +2506,93 @@
    }
   },
   {
+   "type": "timeseries",
+   "title": "Scanners and probes per hour",
+   "id": 27,
+   "description": "Addresses that touched 443 without acting like a client (internet scanners, censorship probes): REALITY hands them to the decoy page.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 4,
+    "x": 16,
+    "y": 42
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "increase(classifier_nonclient_episodes_total{host=\"relay\"}[1h])",
+     "legendFormat": "scanners and probes",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series",
+     "interval": "1h"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "bars",
+      "lineWidth": 2,
+      "fillOpacity": 80,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "fixed",
+      "fixedColor": "#3987e5"
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "scanners and probes"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#3987e5"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "interval": "1h"
+  },
+  {
    "type": "stat",
    "title": "Clients connected",
-   "id": 27,
-   "description": "Distinct client addresses with an open connection right now (probe excluded).",
+   "id": 28,
+   "description": "Distinct real client addresses with an open connection right now (probe and scanners excluded).",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -2572,7 +2655,7 @@
   {
    "type": "row",
    "title": "Servers",
-   "id": 28,
+   "id": 29,
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -2585,7 +2668,7 @@
   {
    "type": "timeseries",
    "title": "CPU busy",
-   "id": 29,
+   "id": 30,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2681,7 +2764,7 @@
   {
    "type": "timeseries",
    "title": "Memory available",
-   "id": 30,
+   "id": 31,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2777,7 +2860,7 @@
   {
    "type": "timeseries",
    "title": "Xray memory (Go heap)",
-   "id": 31,
+   "id": 32,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2873,7 +2956,7 @@
   {
    "type": "timeseries",
    "title": "Errors per hour",
-   "id": 32,
+   "id": 33,
    "description": "No such domain (NXDOMAIN) is normal: apps looking up domains that don't exist. Only failed lookups (timeouts, server errors) alert.",
    "datasource": {
     "type": "prometheus",
@@ -3008,7 +3091,7 @@
   {
    "type": "stat",
    "title": "Disk used: relay",
-   "id": 33,
+   "id": 34,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3081,7 +3164,7 @@
   {
    "type": "stat",
    "title": "Disk used: exit",
-   "id": 34,
+   "id": 35,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3154,7 +3237,7 @@
   {
    "type": "stat",
    "title": "Let's Encrypt cert",
-   "id": 35,
+   "id": 36,
    "description": "Days until the origin certificate CloudFront checks expires (renewed daily).",
    "datasource": {
     "type": "prometheus",
@@ -3227,7 +3310,7 @@
   {
    "type": "stat",
    "title": "Cloudflare origin cert",
-   "id": 36,
+   "id": 37,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3300,7 +3383,7 @@
   {
    "type": "stat",
    "title": "CDN ranges age",
-   "id": 37,
+   "id": 38,
    "description": "Days since the exit firewall's CDN address list was refreshed (update-ranges.sh).",
    "datasource": {
     "type": "prometheus",
@@ -3373,7 +3456,7 @@
   {
    "type": "stat",
    "title": "Monitoring push path",
-   "id": 38,
+   "id": 39,
    "description": "At least one path for the relay's metrics is up.",
    "datasource": {
     "type": "prometheus",
@@ -3463,7 +3546,7 @@
   {
    "type": "row",
    "title": "Alerts firing now",
-   "id": 39,
+   "id": 40,
    "collapsed": false,
    "gridPos": {
     "h": 1,
@@ -3476,7 +3559,7 @@
   {
    "type": "table",
    "title": "Firing alerts",
-   "id": 40,
+   "id": 41,
    "datasource": {
     "type": "prometheus",
     "uid": "vm"

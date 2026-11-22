@@ -138,6 +138,16 @@ What the lab corrected:
 
 Not tested yet: forged resets (S7/S8), carrier-grade NAT, and how a real iPhone ends its connections (stage 2).
 
+**Scanners and probes (found 2026-11-22).** Production data showed most "episodes" weren't users: bursts of up to 17 addresses within 5 minutes, one connection each, around the clock. Port 443 is scanned constantly, and REALITY hands non-clients to the decoy. Since 2026-11-22 an address counts as a client only once its session moved 20 KB (both directions, all connections) or held a connection open for 2 minutes. Everything else goes to `classifier_nonclient_episodes_total`. Episode data before that date is mostly scanners.
+
+| Scenario (lab, 2026-11-22) | Result | Session bytes |
+|---|---|---|
+| scanner: decoy page, bare TCP connect, TLS handshake only (S0) | not a client 3/3 | 6.8–7.4 KB |
+| real client, idle sessions (S1, S3, S5) | counted 7/7 | 34–36 KB |
+| real client, downloading (S2, S4, S6) | counted 7/7 | 45–106 MB |
+
+The margin for an idle real session is only ~1.7×: a client that connects and disconnects without any traffic would be dropped as "not a client", which costs nothing. In the same run, one "killed during a download" (S4) came out client_closed (2/3): when the receive buffer is empty at the kill, the kernel closes with a FIN, not a reset.
+
 ### Stage 2: real phones, ground truth from people
 
 - **On a willing iPhone with v2RayTun, and one Android phone,** each action 5 times with the time noted to the second:

@@ -22,6 +22,14 @@ Lab results (Linux Xray client, monitoring/relay/classifier/lab.sh, 2026-11-19):
   relay_closed  the relay closed the connections
   other         anything else
 
+Only real clients count. Port 443 is also hit by internet scanners and censorship probes,
+which REALITY hands to the decoy; before this filter they made up most episodes (bursts of
+dozens of addresses, one connection each). An address counts as a client once its session
+moved --client-bytes (both directions, all its connections) or held a connection open for
+--client-secs. A scanner gets a TLS handshake and a ~600-byte page from the decoy, and nginx
+closes idle connections after 75 s. Other addresses' episodes only increase
+classifier_nonclient_episodes_total.
+
 Privacy:
 - Client addresses exist only in this process's memory, keyed by HMAC with a random key
   per run, and are dropped once their episode is decided.
@@ -53,6 +61,10 @@ ap.add_argument("--out", default="/var/lib/node_exporter/textfile/classifier.pro
 ap.add_argument("--container", default="vless-relay")
 ap.add_argument("--exclude", action="append", default=[], help="own addresses (the probe)")
 ap.add_argument("--debug-client", help="print episode details for this one address only")
+ap.add_argument("--client-bytes", type=int, default=20000,
+                help="bytes a session must move to count as a real client")
+ap.add_argument("--client-secs", type=float, default=120.0,
+                help="or: a connection open this long counts as a real client")
 a = ap.parse_args()
 
 
@@ -78,7 +90,11 @@ pending = {}                            # client key -> time its count reached 0
 recent = {}                             # client key -> (episode time, label) for RESUME
 debug_key = key(DEBUG) if DEBUG else None
 syn_ttl = {}                            # (addr, port) -> ttl, short-lived
-sk_flow = {}                            # sk -> (client key, syn ttl)
+sk_flow = {}                            # sk -> (client key, syn ttl, open time)
+sess_bytes = defaultdict(int)           # client key -> bytes over the session's ended connections
+longest = defaultdict(float)            # client key -> longest ended connection, seconds
+seeded = set()                          # keys already connected at start (long-lived: clients)
+nonclient = 0
 rst_ttl = {}                            # sk -> ttl of the reset that is about to end it
 closed = {}                             # sk -> (time, end record) for late resets after a FIN
 flow_ends = Counter()
@@ -97,6 +113,13 @@ def seed():
         addr = norm(peer)
         if addr not in EXCLUDE:
             open_count[key(addr)] += 1
+            seeded.add(key(addr))
+
+
+def is_client(k, t):
+    if k in seeded or sess_bytes[k] >= a.client_bytes or longest[k] >= a.client_secs:
+        return True
+    return any(f[0] == k and t - f[2] >= a.client_secs for f in sk_flow.values())
 
 
 def classify(evs):
@@ -132,7 +155,7 @@ def handle(parts):
         if addr in EXCLUDE:
             return
         k = key(addr)
-        sk_flow[sk] = (k, syn_ttl.pop((addr, port), None))
+        sk_flow[sk] = (k, syn_ttl.pop((addr, port), None), t)
         open_count[k] += 1
         pending.pop(k, None)               # came back within GRACE: churn, not an episode
         if k in recent and t - recent[k][0] < RESUME:
@@ -161,6 +184,10 @@ def handle(parts):
         k = key(addr)
         flow = sk_flow.pop(sk, None)
         rttl = rst_ttl.pop(sk, None)
+        nbytes = int(parts[10]) + int(parts[11]) if len(parts) > 11 else 0
+        sess_bytes[k] += nbytes
+        if flow:
+            longest[k] = max(longest[k], t - flow[2])
         if how == "P":
             kind = "fin"
         elif how == "L":
@@ -191,11 +218,13 @@ def handle(parts):
             pending[k] = t
         if k == debug_key:
             print(f"{time.strftime('%H:%M:%S')} end kind={kind} err={err} idle_rcv_ms={idle_rcv_ms} "
-                  f"idle_snd_ms={idle_snd_ms} retrans={retrans} probes={probes} open_left={open_count[k]}",
+                  f"idle_snd_ms={idle_snd_ms} retrans={retrans} probes={probes} open_left={open_count[k]} "
+                  f"bytes={nbytes} session_bytes={sess_bytes[k]} secs={t - flow[2] if flow else -1:.0f}",
                   flush=True)
 
 
 def decide():
+    global nonclient
     t = time.time()
     with lock:
         for k, t0 in list(pending.items()):
@@ -205,13 +234,21 @@ def decide():
             evs = [e for e in ends.pop(k, []) if t0 - e[0] <= WINDOW]
             for s in [s for s, (_, rec) in closed.items() if rec[3] == k]:
                 del closed[s]
-            label = classify(evs)
-            episodes[label] += 1
-            recent[k] = (t0, label)
-            open_count.pop(k, None)
+            client = is_client(k, t)
+            if client:
+                label = classify(evs)
+                episodes[label] += 1
+                recent[k] = (t0, label)
+            else:
+                label = "not a client"
+                nonclient += 1
             if k == debug_key:
-                print(f"{time.strftime('%H:%M:%S')} EPISODE {label} from {sorted(Counter(x[1] for x in evs).items())}",
-                      flush=True)
+                print(f"{time.strftime('%H:%M:%S')} EPISODE {label} from {sorted(Counter(x[1] for x in evs).items())} "
+                      f"session_bytes={sess_bytes[k]} longest_secs={longest[k]:.0f}", flush=True)
+            open_count.pop(k, None)
+            sess_bytes.pop(k, None)
+            longest.pop(k, None)
+            seeded.discard(k)
         for k in [k for k, (t0, _) in recent.items() if t - t0 > RESUME]:
             del recent[k]
 
@@ -224,8 +261,13 @@ def write():
         lines += [f'disconnect_episodes_total{{class="{k}"}} {v}' for k, v in sorted(episodes.items())]
         lines += ["# TYPE disconnect_episodes_resumed_total counter"]
         lines += [f'disconnect_episodes_resumed_total{{class="{k}"}} {v}' for k, v in sorted(resumed.items())]
+        t = time.time()
+        connected = [k for k, v in open_count.items() if v > 0]
         lines += [f"conn_rst_ttl_checked_total {ttl_checked}", f"conn_rst_ttl_mismatch_total {ttl_mismatch}",
-                  f"classifier_clients_connected {sum(1 for v in open_count.values() if v > 0)}",
+                  "# TYPE classifier_nonclient_episodes_total counter",
+                  f"classifier_nonclient_episodes_total {nonclient}",
+                  f"classifier_clients_connected {sum(1 for k in connected if is_client(k, t))}",
+                  f"classifier_addresses_connected {len(connected)}",
                   f"classifier_last_update_timestamp_seconds {int(time.time())}"]
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(a.out), prefix=".tmp-")
     with os.fdopen(fd, "w") as f:

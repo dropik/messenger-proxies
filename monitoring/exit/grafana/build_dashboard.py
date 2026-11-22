@@ -204,17 +204,25 @@ row("Clients and disconnects")
 CLASSES = ["client_closed", "vanished", "reset_active", "stalled", "relay_closed", "other", "injected?"]
 timeseries("Disconnects per hour, by how they ended", [
     target('sum by (class) (increase(disconnect_episodes_total{host="relay"}[1h]))', "{{class}}",
-           interval="1h")], 0, 12, bars=True, stack=True, names=CLASSES, interval="1h",
+           interval="1h")], 0, 10, bars=True, stack=True, names=CLASSES, interval="1h",
     desc="A disconnect = a client address with no connection for 10 s. client_closed: VPN off / app "
          "stopped. vanished: network gone (~2 min to detect). reset_active: app killed during traffic. "
-         "stalled: path broke during traffic. Lab-checked on a Linux client only; see PHASE1.md.")
-timeseries("Client connections on 443", [
+         "stalled: path broke during traffic. Real clients only (session moved 20 KB or held a "
+         "connection 2+ min) since 2026-11-22; before that, scanners dominate. Lab-checked on a Linux "
+         "client only; see PHASE1.md.")
+timeseries("Connections on 443", [
     target('tcp_conns_established{host="relay"}', "open", ref="A"),
     target('tcp_conns_silent_30m{host="relay"}', "silent 30+ min", ref="B"),
     target('tcp_conns_backoff{host="relay"}', "peer not answering", ref="C")],
-    12, 8, names=["open", "silent 30+ min", "peer not answering"])
+    10, 6, names=["open", "silent 30+ min", "peer not answering"],
+    desc="All TCP connections on 443, scanners included.")
+timeseries("Scanners and probes per hour", [
+    target('increase(classifier_nonclient_episodes_total{host="relay"}[1h])', "scanners and probes",
+           interval="1h")], 16, 4, bars=True, names=["scanners and probes"], interval="1h",
+    desc="Addresses that touched 443 without acting like a client (internet scanners, censorship "
+         "probes): REALITY hands them to the decoy page.")
 stat("Clients connected", 'classifier_clients_connected{host="relay"}', 20, 4, h=8, color_mode="none",
-     desc="Distinct client addresses with an open connection right now (probe excluded).")
+     desc="Distinct real client addresses with an open connection right now (probe and scanners excluded).")
 nextrow(8)
 
 # ---------------------------------------------------------------- hosts
