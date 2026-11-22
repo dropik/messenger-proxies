@@ -229,8 +229,11 @@ timeseries("Xray memory (Go heap)", [target('xray_go_heap_bytes', "{{host}}")], 
 timeseries("Errors per hour", [
     target('increase(log_matches_total{host="relay",name="xray_health_fail"}[1h])', "relay: failed health checks",
            ref="A"),
-    target('increase(log_matches_total{host="exit",name="xray_dns_error"}[1h])', "exit: DNS errors", ref="B")],
-    18, 6, names=["relay: failed health checks", "exit: DNS errors"])
+    target('increase(log_matches_total{host="exit",name="xray_dns_error"}[1h])', "exit: failed DNS lookups", ref="B"),
+    target('increase(log_matches_total{host="exit",name="xray_dns_nxdomain"}[1h])', "exit: no such domain", ref="C")],
+    18, 6, names=["relay: failed health checks", "exit: failed DNS lookups", "exit: no such domain"],
+    desc="No such domain (NXDOMAIN) is normal: apps looking up domains that don't exist. Only failed "
+         "lookups (timeouts, server errors) alert.")
 nextrow(8)
 stat("Disk used: relay", '100 * (1 - node_filesystem_avail_bytes{host="relay",mountpoint="/"} / '
      'node_filesystem_size_bytes{host="relay",mountpoint="/"})', 0, 4, unit="percent", decimals=0,

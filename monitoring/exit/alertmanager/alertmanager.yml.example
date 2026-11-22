@@ -24,6 +24,12 @@ route:
     #   repeat_interval: 2m
     - matchers: [ 'alertname="Watchdog"' ]
       receiver: "null"
+    # Events (a restart, a reboot) are over when they are reported: once, silently, no
+    # "resolved" message. Each event is its own group; a shared group would be sent again
+    # every time another event joined it or one ended.
+    - matchers: [ 'type="event"' ]
+      receiver: telegram-event
+      group_by: [ '...' ]
     - matchers: [ 'severity="warning"' ]
       receiver: telegram-quiet
 
@@ -36,6 +42,9 @@ inhibit_rules:
   - source_matchers: [ 'alertname=~"ProbeForwardFailing|ProbeDirectFailing"' ]
     target_matchers: [ 'alertname="ProbeTargetFailing"' ]
     equal: [ group ]
+  - source_matchers: [ 'alertname="HostRebooted"' ]
+    target_matchers: [ 'alertname="ContainerRestarted"' ]
+    equal: [ host ]
 
 receivers:
   - name: "null"
@@ -53,6 +62,14 @@ receivers:
         parse_mode: HTML
         message: '{{ template "telegram.vpn" . }}'
         send_resolved: true
+        disable_notifications: true
+  - name: telegram-event
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/secrets/telegram_token
+        chat_id: 0
+        parse_mode: HTML
+        message: '{{ template "telegram.vpn" . }}'
+        send_resolved: false
         disable_notifications: true
   # - name: heartbeat
   #   webhook_configs:

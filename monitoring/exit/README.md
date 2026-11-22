@@ -47,7 +47,12 @@ It also has to join the `monitoring` network at `10.213.0.20` (see `vless-exit/d
 ## Alerts
 
 Alerts go to a Telegram bot: critical ones with sound, warnings silently, each with a
-"resolved" follow-up. The message format is `alertmanager/telegram.tmpl`.
+"resolved" follow-up. Events (rules labelled `type: event`: a container restart, a reboot)
+are sent once, silently, with no follow-up. The message format is `alertmanager/telegram.tmpl`.
+
+The exit's DNS alert counts only failed lookups (timeouts, server errors). "No such domain"
+answers, mostly apps retrying domains that don't exist, are counted separately
+(`xray_dns_nxdomain`) and shown on the dashboard only.
 
 1. Create a bot with @BotFather (`/newbot`) and send it any message.
 2. Put the token on the exit without it landing in shell history:

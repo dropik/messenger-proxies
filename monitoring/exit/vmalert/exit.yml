@@ -34,14 +34,16 @@ groups:
         labels: { severity: critical }
         annotations: { summary: "{{ $labels.host }}: container {{ $labels.name }} not running" }
 
+      # type=event: something that already happened. Alertmanager sends it once, silently,
+      # with no "resolved" follow-up.
       - alert: ContainerRestarted
         expr: changes(container_started_time_seconds[10m]) > 0
-        labels: { severity: warning }
+        labels: { severity: warning, type: event }
         annotations: { summary: "{{ $labels.host }}: container {{ $labels.name }} restarted (all its connections dropped)" }
 
       - alert: HostRebooted
         expr: node_time_seconds - node_boot_time_seconds < 900   # boot time itself jitters
-        labels: { severity: warning }
+        labels: { severity: warning, type: event }
         annotations: { summary: "{{ $labels.host }}: host rebooted" }
 
       # unattended-upgrades installs security updates but never reboots; a new kernel creates
@@ -68,10 +70,12 @@ groups:
         labels: { severity: warning }
         annotations: { summary: "{{ $labels.host }}: under 15% memory available" }
 
+      # Real lookup failures (DoH timeouts, SERVFAIL...). NXDOMAIN answers ("no such domain",
+      # mostly apps retrying dead domains) are counted separately as xray_dns_nxdomain.
       - alert: ExitDnsErrors
-        expr: increase(log_matches_total{name="xray_dns_error", host="exit"}[15m]) > 50
+        expr: increase(log_matches_total{name="xray_dns_error", host="exit"}[15m]) > 20
         labels: { severity: warning }
-        annotations: { summary: "Exit: {{ $value | humanize }} DNS errors in 15 minutes" }
+        annotations: { summary: "Exit: {{ $value | humanize }} failed DNS lookups in 15 minutes" }
 
       - alert: FirewallRangesStale
         expr: time() - file_mtime_seconds{name="cdn_ranges"} > 35 * 86400

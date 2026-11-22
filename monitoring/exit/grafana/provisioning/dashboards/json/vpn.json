@@ -2874,7 +2874,7 @@
    "type": "timeseries",
    "title": "Errors per hour",
    "id": 32,
-   "description": "",
+   "description": "No such domain (NXDOMAIN) is normal: apps looking up domains that don't exist. Only failed lookups (timeouts, server errors) alert.",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -2904,8 +2904,20 @@
       "uid": "vm"
      },
      "expr": "increase(log_matches_total{host=\"exit\",name=\"xray_dns_error\"}[1h])",
-     "legendFormat": "exit: DNS errors",
+     "legendFormat": "exit: failed DNS lookups",
      "refId": "B",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "increase(log_matches_total{host=\"exit\",name=\"xray_dns_nxdomain\"}[1h])",
+     "legendFormat": "exit: no such domain",
+     "refId": "C",
      "instant": false,
      "range": true,
      "format": "time_series"
@@ -2963,7 +2975,7 @@
      {
       "matcher": {
        "id": "byName",
-       "options": "exit: DNS errors"
+       "options": "exit: failed DNS lookups"
       },
       "properties": [
        {
@@ -2971,6 +2983,21 @@
         "value": {
          "mode": "fixed",
          "fixedColor": "#d95926"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "exit: no such domain"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "#199e70"
         }
        }
       ]
