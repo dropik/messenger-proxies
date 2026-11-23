@@ -4,8 +4,10 @@
 # Secrets, in alertmanager/secrets/ (gitignored; the container runs as uid/gid 65534):
 #   telegram_token   bot token from @BotFather            (root:65534, 0640)
 #   healthchecks_url ping URL of a healthchecks.io check  (optional, same permissions)
+#   users_channel_id the users' channel id (-100...), for chat_id -1 below and announce.sh
 #
-# Critical alerts notify with sound; warnings arrive silently.
+# Critical alerts notify with sound; warnings arrive silently. audience=users alerts go only
+# to the users' channel, in Russian.
 templates:
   - /etc/alertmanager/*.tmpl
 
@@ -24,6 +26,14 @@ route:
     #   repeat_interval: 2m
     - matchers: [ 'alertname="Watchdog"' ]
       receiver: "null"
+    # One post when an outage starts, one when it ends (group_interval: the all-clear
+    # follows within a minute). The owner gets the detailed alerts instead.
+    - matchers: [ 'audience="users"' ]
+      receiver: users-channel
+      group_by: [ alertname ]
+      group_wait: 30s
+      group_interval: 1m
+      repeat_interval: 24h
     # Events (a restart, a reboot) are over when they are reported: once, silently, no
     # "resolved" message. Each event is its own group; a shared group would be sent again
     # every time another event joined it or one ended.
@@ -70,6 +80,14 @@ receivers:
         parse_mode: HTML
         message: '{{ template "telegram.vpn" . }}'
         send_resolved: false
+        disable_notifications: true
+  - name: users-channel
+    telegram_configs:
+      - bot_token_file: /etc/alertmanager/secrets/telegram_token
+        chat_id: -1           # the users' channel id (secrets/users_channel_id)
+        parse_mode: HTML
+        message: '{{ template "telegram.users" . }}'
+        send_resolved: true
         disable_notifications: true
   # - name: heartbeat
   #   webhook_configs:

@@ -13,3 +13,16 @@
 {{ .Annotations.summary | html }}
 {{ end -}}
 {{- end }}
+
+{{/* Users' channel, in Russian, Moscow time. No technical details: it's read by people who
+     only want to know whether it's them or the VPN, and whether to do anything. */}}
+{{ define "telegram.users" -}}
+{{ range .Alerts.Firing -}}
+⚠️ <b>VPN сейчас не работает</b> — примерно с {{ .StartsAt | tz "Europe/Moscow" | date "15:04" }} МСК.
+Уже чиним. Ничего делать не нужно: когда заработает, приложение подключится само.
+{{ end -}}
+{{ range .Alerts.Resolved -}}
+✅ <b>VPN снова работает.</b> Перерыв был примерно с {{ .StartsAt | tz "Europe/Moscow" | date "15:04" }} до {{ .EndsAt | tz "Europe/Moscow" | date "15:04" }} МСК.
+Если не подключается — выключите и включите VPN в приложении.
+{{ end -}}
+{{- end }}

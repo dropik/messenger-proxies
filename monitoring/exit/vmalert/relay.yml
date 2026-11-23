@@ -1,6 +1,18 @@
 groups:
   - name: relay
     rules:
+      # For the users' channel (audience=users), not for the owner: one plain "VPN is down"
+      # when a real client can't get through (either group's probe fails) or the relay is
+      # unreachable. `for` and keep_firing_for keep blips and flapping out of the channel.
+      - alert: VpnOutage
+        expr: |
+          (min(max_over_time(probe_success{host="relay", target="generate_204"}[3m])) == 0)
+          or on() (count(absent_over_time(up{job="node", host="relay"}[5m])) > 0)
+        for: 7m
+        keep_firing_for: 5m
+        labels: { severity: critical, audience: users }
+        annotations: { summary: "VPN outage (users' channel)" }
+
       # vmagent pushes through the tunnel; if nothing arrives, either the relay or every
       # path behind it is down. (vmagent buffers and resends once the path is back.)
       - alert: RelayDataMissing

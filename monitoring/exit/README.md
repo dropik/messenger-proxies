@@ -50,6 +50,23 @@ Alerts go to a Telegram bot: critical ones with sound, warnings silently, each w
 "resolved" follow-up. Events (rules labelled `type: event`: a container restart, a reboot)
 are sent once, silently, with no follow-up. The message format is `alertmanager/telegram.tmpl`.
 
+### Users' channel
+
+A private Telegram channel for the people using the VPN, with the same bot as an admin that
+may only post. It gets two kinds of messages, both silent and in Russian:
+- **Outages, automatically:** `VpnOutage` (`audience: users`) fires when a real client can't get
+  through (either group's probe fails) or the relay is unreachable, after 7 minutes, and stays
+  on 5 minutes after recovery so flapping doesn't post repeatedly. One post when it starts,
+  one when it's over (template `telegram.users`). The owner gets the detailed alerts instead.
+- **Announcements, by hand:** `./announce.sh "текст"` (maintenance, "refresh the subscription").
+
+Setup: create a private channel with a bland name, add the bot as an admin with only "Post
+messages", post anything in it, then read the channel id from the bot's `getUpdates` and save
+it as `alertmanager/secrets/users_channel_id` (root:65534, 0640); it replaces `chat_id: -1`.
+Members can't write in a channel; keep comments (a linked discussion group) off.
+
+### DNS
+
 The exit's DNS alert counts only failed lookups (timeouts, server errors). "No such domain"
 answers, mostly apps retrying domains that don't exist, are counted separately
 (`xray_dns_nxdomain`) and shown on the dashboard only.
