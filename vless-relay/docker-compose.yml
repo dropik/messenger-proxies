@@ -1,8 +1,14 @@
+# Docker keeps container logs forever by default: 3 x 20 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
+
 services:
   vless-relay:
     image: teddysun/xray:26.10.31   # pinned: upgrade relay and exit together
     container_name: vless-relay
     restart: unless-stopped
+    logging: *logging
     ports:
       - "443:443/tcp"
       # monitoring (monitoring/relay): localhost only
@@ -31,6 +37,7 @@ services:
     image: nginx:alpine
     container_name: vless-decoy
     restart: unless-stopped
+    logging: *logging
     volumes:
       - ./decoy/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./decoy:/etc/nginx/decoy:ro

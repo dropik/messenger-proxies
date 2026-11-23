@@ -3,6 +3,11 @@
 # listens only on the monitoring bridge's gateway address.
 name: monitoring
 
+# Docker keeps container logs forever by default: 3 x 20 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
+
 networks:
   monitoring:
     name: monitoring
@@ -24,6 +29,7 @@ services:
     image: victoriametrics/victoria-metrics:v1.155.0
     container_name: mon-victoriametrics
     restart: unless-stopped
+    logging: *logging
     command:
       - -storageDataPath=/storage
       - -retentionPeriod=30d
@@ -43,6 +49,7 @@ services:
     image: victoriametrics/vmalert:v1.155.0
     container_name: mon-vmalert
     restart: unless-stopped
+    logging: *logging
     command:
       - -datasource.url=http://10.213.0.10:8428
       - -remoteWrite.url=http://10.213.0.10:8428
@@ -61,6 +68,7 @@ services:
     image: prom/alertmanager:v0.34.2
     container_name: mon-alertmanager
     restart: unless-stopped
+    logging: *logging
     command:
       - --config.file=/etc/alertmanager/alertmanager.yml
       - --storage.path=/alertmanager
@@ -77,6 +85,7 @@ services:
     image: grafana/grafana:13.2.5
     container_name: mon-grafana
     restart: unless-stopped
+    logging: *logging
     env_file: grafana.env            # GF_SECURITY_ADMIN_PASSWORD (gitignored)
     environment:
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -99,6 +108,7 @@ services:
     image: prom/node-exporter:v1.12.1
     container_name: mon-node-exporter
     restart: unless-stopped
+    logging: *logging
     network_mode: host
     pid: host
     command:

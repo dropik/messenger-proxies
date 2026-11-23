@@ -123,10 +123,16 @@ throttled (~0.2 MB/s), while downloads from them run at full speed. So:
     "tlsSettings": { "minVersion": "1.3", "alpn": ["http/1.1"],
       "certificates": [{ "certificateFile": "/etc/xray/certs/origin-fullchain.pem",
                          "keyFile": "/etc/xray/certs/origin-key.pem" }] },
-    "wsSettings": { "path": "/WS_PATH" }
+    "wsSettings": { "path": "/WS_PATH" },
+    "sockopt": { "trustedXForwardedFor": ["CF-Connecting-IP", "X-Amz-Cf-Id"] }
   }
 }
 ```
+
+`trustedXForwardedFor` (on both inbounds): the CDNs add `X-Forwarded-For` to every request,
+and without this Xray logs a warning per request (about 100,000 a day here). Xray trusts the
+header only when the CDN's own header is present. No rule on the exit uses the source address,
+and the firewall admits only CDN ranges, so trusting it changes nothing else.
 
 CloudFront distribution:
 

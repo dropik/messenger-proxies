@@ -43,6 +43,10 @@
       },
       "streamSettings": {
         "network": "xhttp",
+        "sockopt": {
+          "_comment": "The CDNs send X-Forwarded-For; trust it when the CDN's own header is present (silences a per-request warning).",
+          "trustedXForwardedFor": ["CF-Connecting-IP", "X-Amz-Cf-Id"]
+        },
         "security": "tls",
         "tlsSettings": {
           "minVersion": "1.3",

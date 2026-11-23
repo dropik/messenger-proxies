@@ -1,8 +1,14 @@
+# Docker keeps container logs forever by default: 3 x 20 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
+
 services:
   vless-exit:
     image: teddysun/xray:26.10.31   # pinned: upgrade relay and exit together
     container_name: vless-exit
     restart: unless-stopped
+    logging: *logging
     ports:
       # Reached only through the CDNs; firewall/ restricts both ports to CDN ranges.
       - "8443:8443/tcp"   # Cloudflare and CloudFront (xhttp)

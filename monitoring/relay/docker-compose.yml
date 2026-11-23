@@ -3,6 +3,11 @@
 # pushed through the tunnel to the exit.
 name: monitoring
 
+# Docker keeps container logs forever by default: 3 x 20 MB per container.
+x-logging: &logging
+  driver: json-file
+  options: { max-size: "20m", max-file: "3" }
+
 volumes:
   vmagent-data:
 
@@ -11,6 +16,7 @@ services:
     image: victoriametrics/vmagent:v1.155.0
     container_name: mon-vmagent
     restart: unless-stopped
+    logging: *logging
     network_mode: host
     command:
       - -promscrape.config=/etc/vmagent/scrape.yml
@@ -30,6 +36,7 @@ services:
     image: prom/node-exporter:v1.12.1
     container_name: mon-node-exporter
     restart: unless-stopped
+    logging: *logging
     network_mode: host
     pid: host
     command:
@@ -47,6 +54,7 @@ services:
     image: teddysun/xray:26.10.31
     container_name: mon-probe
     restart: unless-stopped
+    logging: *logging
     network_mode: host
     volumes:
       - /etc/monitoring/probe-client.json:/etc/xray/config.json:ro
