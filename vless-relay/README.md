@@ -72,7 +72,17 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
     broken (all YouTube via Cloudflare), Cloudflare broken (everything via Gcore), Gcore
     broken (no change).
 - **Health checks:** `burstObservatory` pings every `exit-*` and `yt-*` outbound once a
-  minute; unhealthy ones drop out of the balancers until they recover.
+  minute. The balancers use `leastLoad` with `maxRTT` 1 s and `expected` set to the number of
+  outbounds they cover: dead outbounds and ones answering in 1 s or more are skipped, and the
+  rest are picked at random (so the YouTube ratio holds among healthy ones). If none qualify,
+  traffic goes to the fallback. Reason: on 2026-11-24, 20:00–24:00 MSK, single Cloudflare
+  routes from this datacenter stalled (health checks 1–5.5 s, recovering within 3 minutes
+  typically, 15 at most) while `roundRobin` kept sending them a share of new connections.
+  Tested on a copy with 1.5 s of delay added to one Cloudflare IP: its outbounds were skipped
+  and taken back once the delay was gone.
+- **One Cloudflare IP doesn't mean one route:** from this datacenter, the same IP reaches
+  Frankfurt, Amsterdam or Stockholm depending on the connection. The probe records which data
+  centre answers through each IP (`cloudflare_edge_*`).
 - With a single CDN, drop the extra outbounds, the observatory and the balancers, and
   route to `exit-cdn` directly.
 - **Sniffing** (`routeOnly`) reads the domain from TLS/QUIC so phone clients in TUN

@@ -8,6 +8,7 @@ Writes node_exporter textfile metrics. Every 15 minutes it also measures downloa
 """
 import argparse
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -49,10 +50,49 @@ def curl(proxy, url, timeout, detail=False):
     return code, t, speed, ttfb, xfer
 
 
+def cf_edges(env_file, tries=3):
+    """Which Cloudflare data centre each pinned IP reaches, and the TCP connect time there.
+    The relay's provider spreads connections over several routes (one IP reaches FRA, AMS or ARN
+    depending on the connection), and a bad route makes only the connections on it stall."""
+    try:
+        env = dict(l.strip().split("=", 1) for l in open(env_file) if "=" in l and not l.startswith("#"))
+        host = env["CDN_HOSTNAME"]
+    except (OSError, KeyError):
+        return []
+    lines = ["# HELP cloudflare_edge_ok Trace requests through this pinned IP that succeeded (of 3)",
+             "# TYPE cloudflare_edge_ok gauge",
+             "# HELP cloudflare_edge_connect_seconds Fastest TCP connect to this data centre via the IP",
+             "# TYPE cloudflare_edge_connect_seconds gauge",
+             "# HELP cloudflare_edge_hits Trace requests that landed in this data centre (of 3)",
+             "# TYPE cloudflare_edge_hits gauge"]
+    for n in (1, 2):
+        ip = env.get(f"CDN_IP_{n}")
+        if not ip:
+            continue
+        seen, ok = {}, 0
+        for _ in range(tries):
+            r = subprocess.run(["curl", "-s", "--max-time", "10", "--resolve", f"{host}:443:{ip}",
+                                f"https://{host}/cdn-cgi/trace", "-w", "\n@ %{time_connect}\n"],
+                               capture_output=True, text=True)
+            colo = re.search(r"^colo=([A-Z]{3})$", r.stdout, re.M)
+            conn = re.search(r"^@ ([\d.]+)$", r.stdout, re.M)
+            if colo and conn:
+                ok += 1
+                c = seen.setdefault(colo.group(1), [9e9, 0])
+                c[0] = min(c[0], float(conn.group(1)))
+                c[1] += 1
+        lines.append(f'cloudflare_edge_ok{{ip="{n}"}} {ok}')
+        for colo, (t, hits) in seen.items():
+            lines.append(f'cloudflare_edge_connect_seconds{{ip="{n}",colo="{colo}"}} {t:.3f}')
+            lines.append(f'cloudflare_edge_hits{{ip="{n}",colo="{colo}"}} {hits}')
+    return lines
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--out", required=True)
     p.add_argument("--speed-every", type=int, default=15, help="minutes between speed tests")
+    p.add_argument("--cdn-env", help="the relay's .env (CDN_HOSTNAME, CDN_IP_1/2): trace Cloudflare edges")
     a = p.parse_args()
 
     lines = [
@@ -98,6 +138,8 @@ def main():
         ]
     except (OSError, ValueError):
         pass
+    if a.cdn_env:
+        lines += cf_edges(a.cdn_env)
     lines += ["# HELP probe_last_run_timestamp_seconds Last probe run",
               "# TYPE probe_last_run_timestamp_seconds gauge",
               f"probe_last_run_timestamp_seconds {int(time.time())}"]

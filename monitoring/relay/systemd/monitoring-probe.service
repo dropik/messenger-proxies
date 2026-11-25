@@ -4,5 +4,5 @@ After=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /usr/local/lib/monitoring/probe.py --out /var/lib/node_exporter/textfile/probe.prom
+ExecStart=/usr/bin/python3 /usr/local/lib/monitoring/probe.py --out /var/lib/node_exporter/textfile/probe.prom --cdn-env /root/messenger-proxies/vless-relay/.env
 Nice=10

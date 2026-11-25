@@ -1683,7 +1683,7 @@
    "type": "timeseries",
    "title": "RTT",
    "id": 20,
-   "description": "",
+   "description": "Connections that carried data in the last minute only (an idle connection keeps its last RTT for hours).",
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -1848,22 +1848,151 @@
    }
   },
   {
+   "type": "timeseries",
+   "title": "Cloudflare data centres reached from the relay (TCP connect)",
+   "id": 21,
+   "description": "Every minute the probe connects 3 times through each pinned IP. The relay's provider sends connections over different routes, so one IP reaches several data centres; a bad route shows up here as one data centre slowing down or appearing/disappearing.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 0,
+    "y": 32
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "1000 * cloudflare_edge_connect_seconds",
+     "legendFormat": "{{colo}} via IP {{ip}}",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 2,
+      "fillOpacity": 0,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "none",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   }
+  },
+  {
+   "type": "timeseries",
+   "title": "Which data centre answered (of 3 tries per IP)",
+   "id": 22,
+   "description": "Shifts here mean the provider changed routes to Cloudflare.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "vm"
+   },
+   "gridPos": {
+    "h": 8,
+    "w": 12,
+    "x": 12,
+    "y": 32
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "vm"
+     },
+     "expr": "cloudflare_edge_hits",
+     "legendFormat": "{{colo}} via IP {{ip}}",
+     "refId": "A",
+     "instant": false,
+     "range": true,
+     "format": "time_series"
+    }
+   ],
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "none",
+     "custom": {
+      "drawStyle": "bars",
+      "lineWidth": 2,
+      "fillOpacity": 80,
+      "pointSize": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "axisSoftMin": 0,
+      "gradientMode": "none",
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     },
+     "color": {
+      "mode": "palette-classic"
+     }
+    },
+    "overrides": []
+   },
+   "interval": "5m"
+  },
+  {
    "type": "row",
    "title": "Traffic through the relay",
-   "id": 21,
+   "id": 23,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 32
+    "y": 40
    },
    "panels": []
   },
   {
    "type": "timeseries",
    "title": "Download to users, by path",
-   "id": 22,
+   "id": 24,
    "description": "Bytes per second per outbound group on the relay (5-minute average).",
    "datasource": {
     "type": "prometheus",
@@ -1873,7 +2002,7 @@
     "h": 8,
     "w": 12,
     "x": 0,
-    "y": 33
+    "y": 41
    },
    "targets": [
     {
@@ -2025,7 +2154,7 @@
   {
    "type": "timeseries",
    "title": "Upload from users, by path",
-   "id": 23,
+   "id": 25,
    "description": "Bytes per second per outbound group on the relay (5-minute average).",
    "datasource": {
     "type": "prometheus",
@@ -2035,7 +2164,7 @@
     "h": 8,
     "w": 12,
     "x": 12,
-    "y": 33
+    "y": 41
    },
    "targets": [
     {
@@ -2187,20 +2316,20 @@
   {
    "type": "row",
    "title": "Clients and disconnects",
-   "id": 24,
+   "id": 26,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 41
+    "y": 49
    },
    "panels": []
   },
   {
    "type": "timeseries",
    "title": "Disconnects per hour, by how they ended",
-   "id": 25,
+   "id": 27,
    "description": "A disconnect = a client address with no connection for 10 s. client_closed: VPN off / app stopped. vanished: network gone (~2 min to detect). reset_active: app killed during traffic. stalled: path broke during traffic. Real clients only (session moved 20 KB or held a connection 2+ min) since 2026-11-22; before that, scanners dominate. Lab-checked on a Linux client only; see PHASE1.md.",
    "datasource": {
     "type": "prometheus",
@@ -2210,7 +2339,7 @@
     "h": 8,
     "w": 10,
     "x": 0,
-    "y": 42
+    "y": 50
    },
    "targets": [
     {
@@ -2373,7 +2502,7 @@
   {
    "type": "timeseries",
    "title": "Connections on 443",
-   "id": 26,
+   "id": 28,
    "description": "All TCP connections on 443, scanners included.",
    "datasource": {
     "type": "prometheus",
@@ -2383,7 +2512,7 @@
     "h": 8,
     "w": 6,
     "x": 10,
-    "y": 42
+    "y": 50
    },
    "targets": [
     {
@@ -2508,7 +2637,7 @@
   {
    "type": "timeseries",
    "title": "Scanners and probes per hour",
-   "id": 27,
+   "id": 29,
    "description": "Addresses that touched 443 without acting like a client (internet scanners, censorship probes): REALITY hands them to the decoy page.",
    "datasource": {
     "type": "prometheus",
@@ -2518,7 +2647,7 @@
     "h": 8,
     "w": 4,
     "x": 16,
-    "y": 42
+    "y": 50
    },
    "targets": [
     {
@@ -2591,7 +2720,7 @@
   {
    "type": "stat",
    "title": "Clients connected",
-   "id": 28,
+   "id": 30,
    "description": "Distinct real client addresses with an open connection right now (probe and scanners excluded).",
    "datasource": {
     "type": "prometheus",
@@ -2601,7 +2730,7 @@
     "h": 8,
     "w": 4,
     "x": 20,
-    "y": 42
+    "y": 50
    },
    "targets": [
     {
@@ -2655,20 +2784,20 @@
   {
    "type": "row",
    "title": "Servers",
-   "id": 29,
+   "id": 31,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 50
+    "y": 58
    },
    "panels": []
   },
   {
    "type": "timeseries",
    "title": "CPU busy",
-   "id": 30,
+   "id": 32,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2678,7 +2807,7 @@
     "h": 8,
     "w": 6,
     "x": 0,
-    "y": 51
+    "y": 59
    },
    "targets": [
     {
@@ -2764,7 +2893,7 @@
   {
    "type": "timeseries",
    "title": "Memory available",
-   "id": 31,
+   "id": 33,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2774,7 +2903,7 @@
     "h": 8,
     "w": 6,
     "x": 6,
-    "y": 51
+    "y": 59
    },
    "targets": [
     {
@@ -2860,7 +2989,7 @@
   {
    "type": "timeseries",
    "title": "Xray memory (Go heap)",
-   "id": 32,
+   "id": 34,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -2870,7 +2999,7 @@
     "h": 8,
     "w": 6,
     "x": 12,
-    "y": 51
+    "y": 59
    },
    "targets": [
     {
@@ -2956,7 +3085,7 @@
   {
    "type": "timeseries",
    "title": "Errors per hour",
-   "id": 33,
+   "id": 35,
    "description": "No such domain (NXDOMAIN) is normal: apps looking up domains that don't exist. Only failed lookups (timeouts, server errors) alert.",
    "datasource": {
     "type": "prometheus",
@@ -2966,7 +3095,7 @@
     "h": 8,
     "w": 6,
     "x": 18,
-    "y": 51
+    "y": 59
    },
    "targets": [
     {
@@ -3091,7 +3220,7 @@
   {
    "type": "stat",
    "title": "Disk used: relay",
-   "id": 34,
+   "id": 36,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3101,7 +3230,7 @@
     "h": 4,
     "w": 4,
     "x": 0,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3164,7 +3293,7 @@
   {
    "type": "stat",
    "title": "Disk used: exit",
-   "id": 35,
+   "id": 37,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3174,7 +3303,7 @@
     "h": 4,
     "w": 4,
     "x": 4,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3237,7 +3366,7 @@
   {
    "type": "stat",
    "title": "Let's Encrypt cert",
-   "id": 36,
+   "id": 38,
    "description": "Days until the origin certificate CloudFront checks expires (renewed daily).",
    "datasource": {
     "type": "prometheus",
@@ -3247,7 +3376,7 @@
     "h": 4,
     "w": 4,
     "x": 8,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3310,7 +3439,7 @@
   {
    "type": "stat",
    "title": "Cloudflare origin cert",
-   "id": 37,
+   "id": 39,
    "description": "",
    "datasource": {
     "type": "prometheus",
@@ -3320,7 +3449,7 @@
     "h": 4,
     "w": 4,
     "x": 12,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3383,7 +3512,7 @@
   {
    "type": "stat",
    "title": "CDN ranges age",
-   "id": 38,
+   "id": 40,
    "description": "Days since the exit firewall's CDN address list was refreshed (update-ranges.sh).",
    "datasource": {
     "type": "prometheus",
@@ -3393,7 +3522,7 @@
     "h": 4,
     "w": 4,
     "x": 16,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3456,7 +3585,7 @@
   {
    "type": "stat",
    "title": "Monitoring push path",
-   "id": 39,
+   "id": 41,
    "description": "At least one path for the relay's metrics is up.",
    "datasource": {
     "type": "prometheus",
@@ -3466,7 +3595,7 @@
     "h": 4,
     "w": 4,
     "x": 20,
-    "y": 59
+    "y": 67
    },
    "targets": [
     {
@@ -3546,20 +3675,20 @@
   {
    "type": "row",
    "title": "Alerts firing now",
-   "id": 40,
+   "id": 42,
    "collapsed": false,
    "gridPos": {
     "h": 1,
     "w": 24,
     "x": 0,
-    "y": 63
+    "y": 71
    },
    "panels": []
   },
   {
    "type": "table",
    "title": "Firing alerts",
-   "id": 41,
+   "id": 43,
    "datasource": {
     "type": "prometheus",
     "uid": "vm"
@@ -3568,7 +3697,7 @@
     "h": 5,
     "w": 24,
     "x": 0,
-    "y": 64
+    "y": 72
    },
    "targets": [
     {

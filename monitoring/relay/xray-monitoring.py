@@ -65,7 +65,8 @@ if "mon-" not in sel:
 r = c["routing"]
 r["balancers"] = [b for b in r["balancers"] if b["tag"] != "monitor"] + [
     {"tag": "monitor", "selector": ["mon-cdn"], "fallbackTag": "mon-cfws",
-     "strategy": {"type": "roundRobin"}}]
+     "strategy": {"type": "leastLoad", "settings": {
+         "expected": sum(1 for o in mons if o["tag"].startswith("mon-cdn")), "maxRTT": "1000ms"}}}]
 rules = [x for x in r["rules"] if x.get("inboundTag") not in (["monitor-in"], ["vless-in"])]
 for x in rules:
     if x.get("user") and "direct@relay" in x["user"] and "probe-direct@relay" not in x["user"]:

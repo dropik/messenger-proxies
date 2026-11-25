@@ -203,8 +203,11 @@ def collect_peers(out, name, container, match, state):
         for (field, _, _), v, o in zip(PEER_COUNTERS, vals, old):
             totals[field] = totals.get(field, 0) + max(v - o, 0)
         now[key] = vals
+        # The kernel updates a connection's RTT only while data flows: an idle connection keeps
+        # its last value for hours, so only connections active in the last minute count.
         m = re.search(r"\brtt:([\d.]+)", info)
-        if m:
+        last = [int(x) for x in re.findall(r"\blast(?:snd|rcv):(\d+)", info)]
+        if m and last and min(last) < 60000:
             rtts.append(float(m.group(1)))
         if "backoff:" in info:
             backoff += 1
@@ -217,9 +220,10 @@ def collect_peers(out, name, container, match, state):
     out.add("tcp_peer_conns", len(socks), "Established connections to/from these peers", name=name)
     out.add("tcp_peer_stuck_conns", stuck, "Connections with sent data unacknowledged for 2+ s", name=name)
     out.add("tcp_peer_backoff_conns", backoff, "Connections in retransmission backoff", name=name)
+    out.add("tcp_peer_active_conns", len(rtts), "Connections that carried data in the last minute", name=name)
     if rtts:
-        out.add("tcp_peer_rtt_median_ms", rtts[len(rtts) // 2], "Median smoothed RTT", name=name)
-        out.add("tcp_peer_rtt_max_ms", rtts[-1], "Highest smoothed RTT", name=name)
+        out.add("tcp_peer_rtt_median_ms", rtts[len(rtts) // 2], "Median smoothed RTT, active connections", name=name)
+        out.add("tcp_peer_rtt_max_ms", rtts[-1], "Highest smoothed RTT, active connections", name=name)
     for field, metric, h in PEER_COUNTERS:
         out.add(metric, totals.get(field, 0), h, "counter", name=name)
 

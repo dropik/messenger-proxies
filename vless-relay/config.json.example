@@ -250,13 +250,13 @@
         "tag": "youtube",
         "selector": ["yt-"],
         "fallbackTag": "exit-cfws",
-        "strategy": { "type": "roundRobin" }
+        "strategy": { "type": "leastLoad", "settings": { "expected": 3, "maxRTT": "1000ms" } }
       },
       {
         "tag": "rest",
         "selector": ["exit-cdn"],
         "fallbackTag": "exit-cfws",
-        "strategy": { "type": "roundRobin" }
+        "strategy": { "type": "leastLoad", "settings": { "expected": 2, "maxRTT": "1000ms" } }
       }
     ],
     "rules": [

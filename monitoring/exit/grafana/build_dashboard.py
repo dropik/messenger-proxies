@@ -70,7 +70,7 @@ def stat(title, expr, x, w, h=4, mappings=None, unit="none", thresholds=None, co
 
 
 def timeseries(title, targets, x, w, h=8, unit="none", names=None, bars=False, stack=False, desc="",
-               min0=True, interval=""):
+               min0=True, interval="", palette=False):
     custom = {"drawStyle": "bars" if bars else "line", "lineWidth": 2, "fillOpacity": 80 if bars else 0,
               "pointSize": 8, "showPoints": "never", "spanNulls": False,
               "axisSoftMin": 0 if min0 else None, "gradientMode": "none",
@@ -80,7 +80,8 @@ def timeseries(title, targets, x, w, h=8, unit="none", names=None, bars=False, s
          "options": {"legend": {"displayMode": "list", "placement": "bottom", "showLegend": True},
                      "tooltip": {"mode": "multi", "sort": "desc"}},
          "fieldConfig": {"defaults": {"unit": unit, "custom": custom,
-                                      "color": {"mode": "fixed", "fixedColor": SLOT[0]}},
+                                      "color": {"mode": "palette-classic"} if palette
+                                      else {"mode": "fixed", "fixedColor": SLOT[0]}},
                          "overrides": fixed_colors(names or [])}}
     if interval:
         p["interval"] = interval
@@ -183,7 +184,20 @@ timeseries("Loss signals per minute", [
 timeseries("RTT", [
     target('tcp_peer_rtt_median_ms', "{{name}}: median", ref="A"),
     target('tcp_peer_rtt_max_ms', "{{name}}: max", ref="B")],
-    16, 8, unit="ms", names=[f"{p}: {k}" for k in ("median", "max") for p in PEERS])
+    16, 8, unit="ms", names=[f"{p}: {k}" for k in ("median", "max") for p in PEERS],
+    desc="Connections that carried data in the last minute only (an idle connection keeps its last "
+         "RTT for hours).")
+nextrow(8)
+timeseries("Cloudflare data centres reached from the relay (TCP connect)", [
+    target('1000 * cloudflare_edge_connect_seconds', "{{colo}} via IP {{ip}}")],
+    0, 12, unit="ms", palette=True,
+    desc="Every minute the probe connects 3 times through each pinned IP. The relay's provider sends "
+         "connections over different routes, so one IP reaches several data centres; a bad route shows "
+         "up here as one data centre slowing down or appearing/disappearing.")
+timeseries("Which data centre answered (of 3 tries per IP)", [
+    target('cloudflare_edge_hits', "{{colo}} via IP {{ip}}")],
+    12, 12, bars=True, stack=True, palette=True, interval="5m",
+    desc="Shifts here mean the provider changed routes to Cloudflare.")
 nextrow(8)
 
 # ---------------------------------------------------------------- traffic
