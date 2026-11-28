@@ -248,9 +248,9 @@
     "balancers": [
       {
         "tag": "youtube",
-        "selector": ["yt-"],
+        "selector": ["yt-cf"],
         "fallbackTag": "exit-cfws",
-        "strategy": { "type": "leastLoad", "settings": { "expected": 3, "maxRTT": "1000ms" } }
+        "strategy": { "type": "leastLoad", "settings": { "expected": 2, "maxRTT": "1000ms" } }
       },
       {
         "tag": "rest",

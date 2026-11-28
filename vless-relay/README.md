@@ -58,16 +58,21 @@ client ──REALITY/xhttp (SNI = WHITELISTED_SNI)──▶ relay :443
   fast page loads. This does **not** work through Gcore, which buffers xhttp download
   streams (stalls after ~300 KB).
 - **Routing:**
-  - YouTube (sniffed by domain, `geosite:youtube`) round-robins over the `yt-*`
-    outbounds. The live relay uses 7 pure-Cloudflare clones and 3 split ones (~70/30);
-    clone more or fewer to change the ratio (Xray balancers have no weights). This moves
-    about 30% of YouTube's bytes onto CloudFront.
+  - YouTube (sniffed by domain, `geosite:youtube`) goes over the pure-Cloudflare `yt-cf-*`
+    outbounds (7 on the live relay). The split ones are out of the balancer since
+    2026-11-28: from 2026-11-27 ~15:00 UTC, downloads over CloudFront stalled after the
+    headers or the first ~300 KB, on every split outbound and on `exit-cfws`, while tiny
+    requests (like the health check) mostly got through, so health checks kept them in.
+    They stay defined and health-checked; to bring them back, test them on a copy, then
+    widen the selector to `yt-`. With 7 Cloudflare clones and 3 split ones (~70/30), about
+    30% of YouTube's bytes went via CloudFront (Xray balancers have no weights).
   - Everything else: Cloudflare (`exit-cdn` and `exit-cdn-2`, round-robin).
   - Fallback for both: `exit-cfws` (CloudFront, WebSocket on the exit's `8444`, routed by a
     path behavior in the same distribution). Gcore did this until 2026-11-18, when TLS to its
     edge address was blocked from the relay's datacenter. Page loads
     work, uploads are slow. The split outbounds depend on Cloudflare for uploads, so
-    they cannot be a fallback for it.
+    they cannot be a fallback for it. Since 2026-11-27 its downloads stall too (see above),
+    so for now the fallback only half works.
   - Tested on a copy: normal (28 Cloudflare / 12 split YouTube requests), CloudFront
     broken (all YouTube via Cloudflare), Cloudflare broken (everything via Gcore), Gcore
     broken (no change).

@@ -44,6 +44,10 @@ def curl(proxy, url, timeout, detail=False):
         code, t, speed, ttfb, size = int(code), float(t), float(speed), float(ttfb), float(size)
     except ValueError:
         code, t, speed, ttfb, size = 0, float(timeout), 0.0, 0.0, 0.0
+    # curl still reports the HTTP code when the headers arrived but the body then stalled
+    # until --max-time (exit 28): that is a failure, not a slow success.
+    if r.returncode != 0:
+        code = 0
     if not detail:
         return code, t, speed
     xfer = size / (t - ttfb) if t - ttfb > 0.001 else 0.0
