@@ -152,6 +152,13 @@ Gcore (removed): it was the WebSocket fallback until TLS to its edge was blocked
 relay's datacenter on 2026-11-18. `update-ranges.sh` can still add its ~1,300 ranges with
 `CDNS="cloudflare cloudfront gcore"`.
 
+Fastly (tried 2026-11-28, dropped): as a replacement for CloudFront, it carried page loads and
+uploads (1–2.7 MB/s in packet-up mode), but from the relay large tunnel downloads stalled
+partway about two times in three (somewhere between 3 and 10 MB, never recovering). From Italy
+the same setup was clean, and plain large PyPI downloads from the relay were too, so the
+relay's network degrades tunnel streams on Fastly specifically. Its origin connections also
+need TLS 1.3 enabled explicitly (the default maximum is TLS 1.2, which the exit refuses).
+
 The firewall checks only new connections, so a list change doesn't touch established ones.
 Origin changes in CloudFront can take several minutes to reach all edges. Until then,
 requests may hit the old port; the exit answers 404 for paths it doesn't serve.
